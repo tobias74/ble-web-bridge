@@ -1,0 +1,20 @@
+services:
+  ble-web-bridge:
+    image: ble-web-bridge:local
+    build:
+      context: .
+    ports:
+      - "${PORT:-8787}:8787"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      WEB_DIST_DIR: /app/apps/web/dist
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SESSION_TTL_MS: ${SESSION_TTL_MS:-7200000}
+      IDLE_TTL_MS: ${IDLE_TTL_MS:-60000}
+      STALE_MS: ${STALE_MS:-10000}
+      CLEANUP_INTERVAL_MS: ${CLEANUP_INTERVAL_MS:-15000}
+      MAX_TELEMETRY_PER_SECOND: ${MAX_TELEMETRY_PER_SECOND:-10}
+      MAX_COMMANDS_PER_SECOND: ${MAX_COMMANDS_PER_SECOND:-2}
+      MAX_BATCH_CODES: ${MAX_BATCH_CODES:-50}
+      MAX_PAYLOAD_BYTES: ${MAX_PAYLOAD_BYTES:-4096}

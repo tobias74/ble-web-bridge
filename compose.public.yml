@@ -1,0 +1,57 @@
+name: ble-web-bridge-public
+
+services:
+  ble-web-bridge:
+    image: ble-web-bridge:prod
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      WEB_DIST_DIR: /app/apps/web/dist
+      PUBLIC_BASE_URL: https://blebridge.com
+      SESSION_TTL_MS: ${SESSION_TTL_MS:-7200000}
+      IDLE_TTL_MS: ${IDLE_TTL_MS:-60000}
+      STALE_MS: ${STALE_MS:-10000}
+      CLEANUP_INTERVAL_MS: ${CLEANUP_INTERVAL_MS:-15000}
+      MAX_TELEMETRY_PER_SECOND: ${MAX_TELEMETRY_PER_SECOND:-10}
+      MAX_COMMANDS_PER_SECOND: ${MAX_COMMANDS_PER_SECOND:-2}
+      MAX_BATCH_CODES: ${MAX_BATCH_CODES:-50}
+      MAX_PAYLOAD_BYTES: ${MAX_PAYLOAD_BYTES:-4096}
+    expose:
+      - "8787"
+    networks:
+      public-edge:
+        aliases:
+          - ble-web-bridge
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: bike-router-public
+      traefik.http.routers.ble-web-bridge.rule: "Host(`blebridge.com`)"
+      traefik.http.routers.ble-web-bridge.entrypoints: websecure
+      traefik.http.routers.ble-web-bridge.tls.certresolver: letsencrypt
+      traefik.http.routers.ble-web-bridge.service: ble-web-bridge
+      traefik.http.routers.ble-web-bridge-www.rule: "Host(`www.blebridge.com`)"
+      traefik.http.routers.ble-web-bridge-www.entrypoints: websecure
+      traefik.http.routers.ble-web-bridge-www.tls.certresolver: letsencrypt
+      traefik.http.routers.ble-web-bridge-www.middlewares: ble-web-bridge-www-redirect@docker
+      traefik.http.routers.ble-web-bridge-www.service: ble-web-bridge
+      traefik.http.middlewares.ble-web-bridge-www-redirect.redirectregex.regex: "^https?://www\\.blebridge\\.com/(.*)"
+      traefik.http.middlewares.ble-web-bridge-www-redirect.redirectregex.replacement: "https://blebridge.com/$${1}"
+      traefik.http.middlewares.ble-web-bridge-www-redirect.redirectregex.permanent: "true"
+      traefik.http.services.ble-web-bridge.loadbalancer.server.port: "8787"
+
+networks:
+  public-edge:
+    external: true
+    name: bike-router-public
