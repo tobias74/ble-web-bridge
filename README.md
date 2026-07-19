@@ -90,11 +90,21 @@ Build without plugins:
 npm run build
 ```
 
-Build with an external configuration:
+Build with an external configuration on Linux or macOS:
 
 ```bash
 BLE_BRIDGE_PLUGIN_CONFIG=/absolute/path/ble-bridge.plugins.json npm run build
 ```
+
+Build with an external configuration in PowerShell:
+
+```powershell
+$env:BLE_BRIDGE_PLUGIN_CONFIG = 'E:\private-profiles\ble-bridge.plugins.json'
+npm run build
+Remove-Item Env:BLE_BRIDGE_PLUGIN_CONFIG
+```
+
+The environment variable is needed only while Vite builds or serves the web application. For a copy-and-paste profile example and the complete adapter contract, see [Creating a minimal private profile](docs/plugins.md#creating-a-minimal-private-profile).
 
 ## API
 
