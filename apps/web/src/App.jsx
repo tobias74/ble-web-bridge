@@ -6,6 +6,7 @@ import {
   Copy,
   Gauge,
   HeartPulse,
+  Languages,
   Link,
   Pause,
   Play,
@@ -18,6 +19,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createSession, getDefaultRelayUrl, trimTrailingSlash } from './api.js';
+import { useI18n } from './i18n.js';
+import { APP_PAGES, pageFromHash, pageHref } from './navigation.js';
+import { InformationPage } from './Pages.jsx';
 import {
   BLE_DISCOVERY_SERVICES,
   DEFAULT_REMOTE_CONTROL_PERMISSIONS,
@@ -43,16 +47,18 @@ const BLE_SCAN_SERVICES_STORAGE_KEY = 'ble-bridge-selected-ble-services-v1';
 const BLE_SCAN_DISPLAY_ALL_STORAGE_KEY = 'ble-bridge-display-all-devices-v1';
 const REMOTE_CONTROL_STORAGE_KEY = 'ble-bridge-remote-control-permissions-v1';
 export default function App({ plugins = [] }) {
+  const { language, setLanguage, t } = useI18n();
+  const [page, setPage] = useState(() => pageFromHash(globalThis.location?.hash));
   const commandDefinitions = useMemo(() => [
     ...STANDARD_COMMAND_DEFINITIONS,
     ...getPluginCommandDefinitions(plugins)
   ], [plugins]);
   const remoteControlOptions = useMemo(() => commandDefinitions.map((command) => ({
     key: command.permissionKey,
-    label: command.permissionLabel,
+    label: permissionLabel(command, t),
     capability: command.capability,
     tier: command.tier
-  })), [commandDefinitions]);
+  })), [commandDefinitions, t]);
   const discoveryServices = useMemo(() => [
     ...BLE_DISCOVERY_SERVICES,
     ...getPluginDiscoveryServices(plugins)
@@ -89,6 +95,22 @@ export default function App({ plugins = [] }) {
   useEffect(() => {
     sourceRef.current = sources;
   }, [sources]);
+
+  useEffect(() => {
+    function handleHashChange() {
+      setPage(pageFromHash(globalThis.location?.hash));
+    }
+
+    globalThis.addEventListener?.('hashchange', handleHashChange);
+    return () => globalThis.removeEventListener?.('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const pageTitle = page === 'bridge' ? 'BLE Bridge' : `${t(`nav.${page}`)} · BLE Bridge`;
+    if (globalThis.document) {
+      globalThis.document.title = pageTitle;
+    }
+  }, [page, t]);
 
   useEffect(() => {
     selectedMetricSourcesRef.current = selectedMetricSources;
@@ -170,29 +192,29 @@ export default function App({ plugins = [] }) {
 
   const sourceList = useMemo(() => sortSources(sources), [sources]);
   const visibleMetrics = useMemo(() => (
-    createVisibleMetrics(sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities)
-  ), [sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities]);
+    createVisibleMetrics(sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities, t)
+  ), [sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities, t]);
   const metricSelectionRows = useMemo(() => (
-    createMetricSelectionRows(sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities)
-  ), [sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities]);
+    createMetricSelectionRows(sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities, t)
+  ), [sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities, t]);
   const metricSourceRows = useMemo(() => (
-    createMetricSourceRows(sourceList, disabledMetricSources)
-  ), [sourceList, disabledMetricSources]);
+    createMetricSourceRows(sourceList, disabledMetricSources, t)
+  ), [sourceList, disabledMetricSources, t]);
   const remoteControlCapabilities = useMemo(() => (
     createRemoteControlCapabilityState(devices, deviceHandlesRef.current, remoteControlOptions)
   ), [devices, sources, remoteControlOptions]);
 
   const statusLabel = useMemo(() => {
     if (!session) {
-      return 'No session';
+      return t('status.noSession');
     }
 
     if (socketState === 'connected' && streaming) {
-      return 'Streaming';
+      return t('status.streaming');
     }
 
-    return socketState;
-  }, [session, socketState, streaming]);
+    return t(`status.${socketState}`, {}, socketState);
+  }, [session, socketState, streaming, t]);
 
   async function handleCreateSession() {
     setError('');
@@ -263,7 +285,7 @@ export default function App({ plugins = [] }) {
 
     setDevices((current) => [...current, {
       id: deviceId,
-      name: 'Selecting device',
+      name: '',
       status: 'selecting',
       protocols: [],
       capabilities: {}
@@ -461,8 +483,7 @@ export default function App({ plugins = [] }) {
     setWarnings((current) => [{
       id: `${Date.now()}-${Math.random()}`,
       type: command?.type || 'command',
-      reason,
-      text: warningText(command?.type, reason, plugins)
+      reason
     }, ...current].slice(0, 3));
   }
 
@@ -490,28 +511,54 @@ export default function App({ plugins = [] }) {
   return (
     <main className="shell">
       <header className="topbar">
-        <div>
-          <h1>BLE Bridge</h1>
-          <p>{statusLabel}</p>
+        <div className="brand-block">
+          <a className="brand-link" href={pageHref('bridge')}>BLE Bridge</a>
+          <div className="bridge-status">
+            <span className={`status-dot ${socketState === 'connected' ? 'online' : ''}`} aria-hidden="true" />
+            <span>{statusLabel}</span>
+          </div>
         </div>
-        <div className={`status-dot ${socketState === 'connected' ? 'online' : ''}`} aria-label={statusLabel} />
+
+        <div className="topbar-actions">
+          <nav className="app-nav" aria-label={t('nav.navigation')}>
+            {APP_PAGES.map((item) => (
+              <a
+                aria-current={page === item ? 'page' : undefined}
+                className={page === item ? 'active' : ''}
+                href={pageHref(item)}
+                key={item}
+              >
+                {t(`nav.${item}`)}
+              </a>
+            ))}
+          </nav>
+
+          <label className="language-select">
+            <Languages size={17} aria-hidden="true" />
+            <span>{t('language.label')}</span>
+            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              <option value="en">{t('language.english')}</option>
+              <option value="de">{t('language.german')}</option>
+            </select>
+          </label>
+        </div>
       </header>
 
-      <section className="workspace">
+      {page === 'bridge' ? <section className="workspace">
         <div className="panel session-panel">
           <div className="panel-title">
             <Link size={18} />
-            <span>Session</span>
+            <span>{t('session.title')}</span>
           </div>
 
           <label className="field">
-            <span>Relay URL</span>
+            <span>{t('session.relayUrl')}</span>
             <input value={relayUrl} onChange={(event) => setRelayUrl(event.target.value)} />
           </label>
 
           <div className="session-code">
             <span>{session?.code || '---- ----'}</span>
-            <button className="icon-button" onClick={copySessionCode} disabled={!session?.code} title="Copy code" aria-label="Copy code">
+            <button className="icon-button" onClick={copySessionCode} disabled={!session?.code} title={t('session.copyCode')} aria-label={t('session.copyCode')}>
               <Copy size={18} />
             </button>
           </div>
@@ -519,26 +566,26 @@ export default function App({ plugins = [] }) {
           <div className="button-row">
             <button className="primary-button" onClick={handleCreateSession}>
               {socketState === 'reconnecting' ? <RefreshCw size={18} /> : <Radio size={18} />}
-              <span>{session ? 'New session' : 'Start session'}</span>
+              <span>{session ? t('session.new') : t('session.start')}</span>
             </button>
             <button className="ghost-button" onClick={() => setStreaming((value) => !value)} disabled={!session || socketState !== 'connected'}>
               {streaming ? <Pause size={18} /> : <Play size={18} />}
-              <span>{streaming ? 'Pause' : 'Stream'}</span>
+              <span>{streaming ? t('session.pause') : t('session.stream')}</span>
             </button>
           </div>
 
-          {error ? <div className="error-line">{error}</div> : null}
+          {error ? <div className="error-line">{localizedError(error, t)}</div> : null}
         </div>
 
         <div className="panel device-panel">
           <div className="panel-title">
             <Bluetooth size={18} />
-            <span>Devices</span>
+            <span>{t('devices.title')}</span>
           </div>
 
           <div className="scan-options">
             <div className="scan-option-group">
-              <div className="scan-group-title">Services to connect</div>
+              <div className="scan-group-title">{t('devices.services')}</div>
               <div className="scan-service-list">
                 {discoveryServices.map((service) => (
                   <label className="scan-service-toggle" key={service.key}>
@@ -547,7 +594,7 @@ export default function App({ plugins = [] }) {
                       checked={selectedDiscoveryServices[service.key] !== false}
                       onChange={(event) => handleDiscoveryServiceToggle(service.key, event.target.checked)}
                     />
-                    <span>{service.label}</span>
+                    <span>{discoveryServiceLabel(service, t)}</span>
                   </label>
                 ))}
               </div>
@@ -560,7 +607,7 @@ export default function App({ plugins = [] }) {
                   checked={displayAllDevices}
                   onChange={(event) => setDisplayAllDevices(event.target.checked)}
                 />
-                <span>Scan all devices</span>
+                <span>{t('devices.scanAll')}</span>
               </label>
 
               <button
@@ -569,7 +616,7 @@ export default function App({ plugins = [] }) {
                 onClick={handleScanDevice}
               >
                 <Bluetooth size={18} />
-                <span>Scan</span>
+                <span>{t('devices.scan')}</span>
               </button>
             </div>
           </div>
@@ -581,12 +628,12 @@ export default function App({ plugins = [] }) {
                   <div className="device-main">
                     <div className="device-status">
                       <Check size={18} />
-                      <span>{device.name}: {device.status}</span>
+                       <span>{localizedDeviceName(device.name, t)}: {t(`status.${device.status}`, {}, device.status)}</span>
                     </div>
                     {device.protocols.length > 0 ? (
-                      <div className="protocol-list" aria-label={`${device.name} protocols`}>
+                      <div className="protocol-list" aria-label={t('devices.protocols', { name: localizedDeviceName(device.name, t) })}>
                         {device.protocols.map((protocol) => (
-                          <span className="protocol-chip" key={protocol}>{protocol}</span>
+                          <span className="protocol-chip" key={protocol}>{formatProtocol(protocol, t)}</span>
                         ))}
                       </div>
                     ) : null}
@@ -595,8 +642,8 @@ export default function App({ plugins = [] }) {
                     className="icon-button"
                     onClick={() => disconnectDevice(device.id)}
                     disabled={!deviceHandlesRef.current.has(device.id)}
-                    title="Disconnect"
-                    aria-label={`Disconnect ${device.name}`}
+                    title={t('devices.disconnect')}
+                    aria-label={t('devices.disconnectNamed', { name: localizedDeviceName(device.name, t) })}
                   >
                     <Unplug size={18} />
                   </button>
@@ -604,7 +651,7 @@ export default function App({ plugins = [] }) {
               ))}
             </div>
           ) : (
-            <div className="empty-line">No BLE devices connected</div>
+            <div className="empty-line">{t('devices.none')}</div>
           )}
 
           <RemoteControlPanel
@@ -619,7 +666,7 @@ export default function App({ plugins = [] }) {
               {warnings.map((warning) => (
                 <div className="warning-line" key={warning.id}>
                   <AlertTriangle size={18} />
-                  <span>{warning.text}</span>
+                  <span>{warningText(warning.type, warning.reason, plugins, t)}</span>
                 </div>
               ))}
             </div>
@@ -638,7 +685,7 @@ export default function App({ plugins = [] }) {
               />
             ))
           ) : (
-            <div className="metrics-empty empty-line">No live values yet</div>
+            <div className="metrics-empty empty-line">{t('metrics.none')}</div>
           )}
         </div>
 
@@ -655,7 +702,7 @@ export default function App({ plugins = [] }) {
           <SourceValuesPanel sources={sourceList} />
           <CommandHistoryPanel commands={recentCommands} plugins={plugins} />
         </div>
-      </section>
+      </section> : <InformationPage page={page} />}
     </main>
   );
 }
@@ -671,16 +718,18 @@ function MetricCard({ icon, label, tone, value }) {
 }
 
 function MetricSelectionPanel({ rows, sourceRows, onChange, onToggleSource }) {
+  const { t } = useI18n();
+
   return (
     <div className="panel selection-panel">
       <div className="panel-title">
         <SlidersHorizontal size={18} />
-        <span>Primary metrics</span>
+        <span>{t('metrics.title')}</span>
       </div>
 
       {sourceRows.length > 0 ? (
         <>
-          <div className="selection-group-title">Sources</div>
+          <div className="selection-group-title">{t('metrics.sources')}</div>
           <div className="metric-source-list">
             {sourceRows.map((source) => (
               <label className="metric-source-toggle" key={source.preferenceKey}>
@@ -698,7 +747,7 @@ function MetricSelectionPanel({ rows, sourceRows, onChange, onToggleSource }) {
 
       {rows.length > 0 ? (
         <>
-          <div className="selection-group-title">Values</div>
+          <div className="selection-group-title">{t('metrics.values')}</div>
           <div className="selection-list">
             {rows.map((row) => (
               <label className="selection-row" key={row.key}>
@@ -720,6 +769,7 @@ function MetricSelectionPanel({ rows, sourceRows, onChange, onToggleSource }) {
 }
 
 function RemoteControlPanel({ permissions, capabilities, options, onChange }) {
+  const { t } = useI18n();
   const normalizedPermissions = normalizeRemoteControlPermissions(permissions, false, options.map((option) => ({
     permissionKey: option.key,
     defaultEnabled: option.tier === 'standard'
@@ -743,7 +793,7 @@ function RemoteControlPanel({ permissions, capabilities, options, onChange }) {
           checked={normalizedPermissions.enabled}
           onChange={(event) => onChange('enabled', event.target.checked)}
         />
-        <span>Allow remote control</span>
+        <span>{t('remote.allow')}</span>
       </label>
 
       {standardOptions.length > 0 ? (
@@ -761,7 +811,7 @@ function RemoteControlPanel({ permissions, capabilities, options, onChange }) {
 
       {advancedOptions.length > 0 ? (
         <>
-          <div className="control-group-title">Advanced controls</div>
+          <div className="control-group-title">{t('remote.advanced')}</div>
           <div className="control-grid advanced-grid">
             {advancedOptions.map((option) => (
               <RemoteControlToggle
@@ -792,11 +842,13 @@ function RemoteControlToggle({ option, permissions, onChange }) {
 }
 
 function SourceValuesPanel({ sources }) {
+  const { language, t } = useI18n();
+
   return (
     <div className="panel values-panel">
       <div className="panel-title">
         <Activity size={18} />
-        <span>Sources</span>
+        <span>{t('sources.title')}</span>
       </div>
 
       {sources.length > 0 ? (
@@ -805,13 +857,13 @@ function SourceValuesPanel({ sources }) {
             <div className={`source-row ${source.connected ? 'connected' : 'disconnected'}`} key={source.sourceId}>
               <div className="source-head">
                 <div>
-                  <strong>{formatProtocol(source.protocol)}</strong>
+                  <strong>{formatProtocol(source.protocol, t)}</strong>
                   <span>{source.deviceName || source.deviceId}</span>
                 </div>
-                <time>{formatClock(source.timestampMs)}</time>
+                <time>{formatClock(source.timestampMs, language)}</time>
               </div>
               <div className="value-grid">
-                {createSourceValueRows(source).map((row) => (
+                {createSourceValueRows(source, t).map((row) => (
                   <div className="value-row" key={`${source.sourceId}-${row.label}`}>
                     <span>{row.label}</span>
                     <strong>{row.value}</strong>
@@ -822,18 +874,20 @@ function SourceValuesPanel({ sources }) {
           ))}
         </div>
       ) : (
-        <div className="empty-line">No source values yet</div>
+        <div className="empty-line">{t('sources.none')}</div>
       )}
     </div>
   );
 }
 
 function CommandHistoryPanel({ commands, plugins }) {
+  const { language, t } = useI18n();
+
   return (
     <div className="panel commands-panel">
       <div className="panel-title">
         <Radio size={18} />
-        <span>Commands</span>
+        <span>{t('commands.title')}</span>
       </div>
 
       {commands.length > 0 ? (
@@ -845,14 +899,14 @@ function CommandHistoryPanel({ commands, plugins }) {
                 <span>{formatCommandValue(entry.command, plugins)}</span>
               </div>
               <div className="command-meta">
-                <span>{formatCommandStatus(entry)}</span>
-                <time>{formatClock(entry.handledAt || entry.receivedAt)}</time>
+                <span>{formatCommandStatus(entry, t)}</span>
+                <time>{formatClock(entry.handledAt || entry.receivedAt, language)}</time>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="empty-line">No commands yet</div>
+        <div className="empty-line">{t('commands.none')}</div>
       )}
     </div>
   );
@@ -974,21 +1028,24 @@ function sourceSortKey(source) {
   ].join('\u0000');
 }
 
-function createSourceValueRows(source) {
+function createSourceValueRows(source, t) {
   const rows = Object.entries(source.values || {}).map(([key, value]) => ({
-    label: valueLabel(key),
+    label: valueLabel(key, t),
     value: formatValue(key, value)
   }));
 
   if (Number.isFinite(source.info?.batteryPct)) {
-    rows.push({ label: 'Battery', value: formatMetric(source.info.batteryPct, '%', 0) });
+    rows.push({ label: t('sources.battery'), value: formatMetric(source.info.batteryPct, '%', 0) });
   }
 
   if (source.info?.modelNumber) {
-    rows.push({ label: 'Model', value: source.info.modelNumber });
+    rows.push({ label: t('sources.model'), value: source.info.modelNumber });
   }
 
-  return rows.length > 0 ? rows : [{ label: 'Status', value: source.connected ? 'connected' : 'disconnected' }];
+  return rows.length > 0 ? rows : [{
+    label: t('sources.status'),
+    value: t(`status.${source.connected ? 'connected' : 'disconnected'}`)
+  }];
 }
 
 const SUMMARY_METRIC_KEYS = [
@@ -1050,7 +1107,7 @@ function mergeMetricProtocolPriorities(pluginPriorities = {}) {
   return merged;
 }
 
-function createVisibleMetrics(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES) {
+function createVisibleMetrics(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES, t) {
   const metrics = [];
 
   for (const key of SUMMARY_METRIC_KEYS) {
@@ -1063,7 +1120,7 @@ function createVisibleMetrics(sources, selectedMetricSources = {}, disabledMetri
     metrics.push({
       key,
       icon: metricIconName(key),
-      label: valueLabel(key),
+      label: valueLabel(key, t),
       tone: metricTone(key),
       value: formatValue(key, source.values[key])
     });
@@ -1072,7 +1129,7 @@ function createVisibleMetrics(sources, selectedMetricSources = {}, disabledMetri
   return metrics;
 }
 
-function createMetricSourceRows(sources, disabledMetricSources = {}) {
+function createMetricSourceRows(sources, disabledMetricSources = {}, t) {
   const rows = [];
   const seen = new Set();
 
@@ -1089,7 +1146,7 @@ function createMetricSourceRows(sources, disabledMetricSources = {}) {
     seen.add(preferenceKey);
     rows.push({
       preferenceKey,
-      label: sourceName(source),
+      label: sourceName(source, t),
       disabled: Boolean(disabledMetricSources[preferenceKey])
     });
   }
@@ -1097,7 +1154,7 @@ function createMetricSourceRows(sources, disabledMetricSources = {}) {
   return rows;
 }
 
-function createMetricSelectionRows(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES) {
+function createMetricSelectionRows(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES, t) {
   const rows = [];
 
   for (const key of SUMMARY_METRIC_KEYS) {
@@ -1111,11 +1168,11 @@ function createMetricSelectionRows(sources, selectedMetricSources = {}, disabled
 
     rows.push({
       key,
-      label: valueLabel(key),
+      label: valueLabel(key, t),
       value: selectedSource ? sourcePreferenceKey(selectedSource) : sourcePreferenceKey(choices[0]),
       choices: choices.map((source) => ({
         preferenceKey: sourcePreferenceKey(source),
-        label: `${sourceName(source)} · ${formatValue(key, source.values[key])}`
+        label: `${sourceName(source, t)} · ${formatValue(key, source.values[key])}`
       }))
     });
   }
@@ -1191,9 +1248,9 @@ function sourcePreferenceKey(source) {
   ].join('::');
 }
 
-function sourceName(source) {
-  const protocol = formatProtocol(source.protocol);
-  const device = source.deviceName || source.deviceId || 'Device';
+function sourceName(source, t) {
+  const protocol = formatProtocol(source.protocol, t);
+  const device = source.deviceName || source.deviceId || t('sources.device');
   return `${device} · ${protocol}`;
 }
 
@@ -1245,40 +1302,8 @@ function metricTone(key) {
   return 'activity';
 }
 
-function valueLabel(key) {
-  const labels = {
-    speedMps: 'Speed',
-    averageSpeedMps: 'Avg Speed',
-    cadenceRpm: 'Cadence',
-    cadenceSpm: 'Run Cadence',
-    powerW: 'Power',
-    averagePowerW: 'Avg Power',
-    distanceM: 'Distance',
-    inclinePct: 'Incline',
-    rampAngleDeg: 'Ramp',
-    heartBpm: 'Heart',
-    strideLengthM: 'Stride',
-    strideCount: 'Strides',
-    strokeRateSpm: 'Stroke Rate',
-    averageStrokeRateSpm: 'Avg Stroke',
-    strokeCount: 'Strokes',
-    paceSecondsPer500m: 'Pace',
-    averagePaceSecondsPer500m: 'Avg Pace',
-    resistanceLevel: 'Resistance',
-    totalEnergyKcal: 'Energy',
-    energyPerHourKcal: 'kcal/h',
-    energyPerMinuteKcal: 'kcal/min',
-    metabolicEquivalent: 'MET',
-    elapsedTimeS: 'Elapsed',
-    remainingTimeS: 'Remaining',
-    stepsPerMinute: 'Step Rate',
-    averageStepRateSpm: 'Avg Step',
-    stepCount: 'Steps',
-    floors: 'Floors',
-    elevationGainM: 'Elevation'
-  };
-
-  return labels[key] || key;
+function valueLabel(key, t) {
+  return t(`values.${key}`, {}, key);
 }
 
 function formatValue(key, value) {
@@ -1358,66 +1383,82 @@ function formatCommandValue(command, plugins = []) {
   return command.commandId ? shortId(command.commandId) : '--';
 }
 
-function formatCommandStatus(entry) {
+function formatCommandStatus(entry, t) {
   if (entry.status === 'received') {
-    return 'received';
+    return t('commands.received');
   }
 
   if (entry.status === 'applied') {
-    return 'applied';
+    return t('commands.applied');
   }
 
   if (entry.reason) {
-    return `${entry.status}: ${entry.reason}`;
+    return `${t(`commands.${entry.status}`, {}, entry.status)}: ${entry.reason}`;
   }
 
-  return entry.status || 'unknown';
+  return entry.status ? t(`commands.${entry.status}`, {}, entry.status) : t('commands.unknown');
 }
 
-function warningText(type, reason, plugins = []) {
-  const family = commandFamilyLabel(type, plugins);
+function warningText(type, reason, plugins = [], t) {
+  const family = commandFamilyLabel(type, plugins, t);
 
   if (reason === 'treadmill_control_disabled') {
-    return `${family} blocked`;
+    return t('warnings.blocked', { family });
   }
 
   if (reason === 'permission_disabled' || reason === 'bike_control_not_enabled') {
-    return `${family} blocked: permission disabled`;
+    return t('warnings.permissionDisabled', { family });
   }
 
   if (reason === 'capability_not_supported' || reason === 'bike_control_not_supported') {
-    return `${family} blocked: capability not supported`;
+    return t('warnings.capabilityUnsupported', { family });
   }
 
   if (reason === 'multiple_bike_control_targets') {
-    return `${family} blocked: multiple controllable bikes`;
+    return t('warnings.multipleTargets', { family });
   }
 
   if (reason === 'no_device_connected') {
-    return `${family} blocked: no device connected`;
+    return t('warnings.noDevice', { family });
   }
 
   if (reason === 'command_expired') {
-    return `${family} blocked: expired`;
+    return t('warnings.expired', { family });
   }
 
-  return `${family} blocked: ${reason || 'unknown'}`;
+  return t('warnings.reason', { family, reason: reason || t('commands.unknown') });
 }
 
-function commandFamilyLabel(type, plugins = []) {
-  const labels = {
-    'bike.grade': 'Grade command',
-    'bike.resistance': 'Resistance command',
-    'bike.targetPower': 'Target power command',
-    'treadmill.speed': 'Treadmill command',
-    'treadmill.incline': 'Treadmill command'
+function commandFamilyLabel(type, plugins = [], t) {
+  const labelKeys = {
+    'bike.grade': 'commands.grade',
+    'bike.resistance': 'commands.resistance',
+    'bike.targetPower': 'commands.targetPower',
+    'treadmill.speed': 'commands.treadmill',
+    'treadmill.incline': 'commands.treadmill'
   };
 
-  return labels[type] || pluginCommandLabel(type, plugins) || 'Command';
+  return labelKeys[type]
+    ? t(labelKeys[type])
+    : pluginCommandLabel(type, plugins) || t('commands.generic');
 }
 
-function formatProtocol(protocol) {
-  return String(protocol || 'unknown').replaceAll('_', ' ').replaceAll('.', ' ');
+function formatProtocol(protocol, t) {
+  const value = String(protocol || 'unknown');
+  const labelKeys = {
+    'FTMS Cross Trainer': 'protocol.ftms.cross_trainer',
+    'FTMS Step Climber': 'protocol.ftms.step_climber',
+    'FTMS Stair Climber': 'protocol.ftms.stair_climber',
+    'FTMS Rower': 'protocol.ftms.rower',
+    'FTMS Indoor Bike': 'protocol.ftms.indoor_bike',
+    'FTMS Treadmill': 'protocol.ftms.treadmill',
+    'Cycling Power': 'protocol.cycling_power',
+    'Cycling Speed/Cadence': 'protocol.cycling_speed_cadence',
+    'Heart Rate': 'protocol.heart_rate',
+    'Running Speed/Cadence': 'protocol.running_speed_cadence'
+  };
+  const fallback = value.replaceAll('_', ' ').replaceAll('.', ' ');
+  return t(labelKeys[value] || `protocol.${value}`, {}, fallback);
 }
 
 function formatMetric(value, unit, digits) {
@@ -1439,16 +1480,58 @@ function formatDuration(seconds) {
   return `${minutes}:${remainder}`;
 }
 
-function formatClock(timestampMs) {
+function formatClock(timestampMs, language = 'en') {
   if (!Number.isFinite(timestampMs)) {
     return '--';
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(language === 'de' ? 'de-DE' : 'en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit'
   }).format(new Date(timestampMs));
+}
+
+function permissionLabel(command, t) {
+  const builtInKeys = {
+    grade: 'permissions.grade',
+    resistance: 'permissions.resistance',
+    targetPower: 'permissions.targetPower'
+  };
+  const key = builtInKeys[command.permissionKey];
+  return key ? t(key) : command.permissionLabel;
+}
+
+function discoveryServiceLabel(service, t) {
+  return t(`services.${service.key}`, {}, service.label);
+}
+
+function localizedDeviceName(name, t) {
+  if (!name) {
+    return t('devices.selecting');
+  }
+  return name === 'BLE device' ? t('devices.unnamed') : name;
+}
+
+function localizedError(error, t) {
+  const value = String(error || '');
+  const exactKeys = {
+    invalid_server_message: 'errors.invalid_server_message',
+    websocket_error: 'errors.websocket_error',
+    'Web Bluetooth is not available in this browser': 'errors.webBluetoothUnavailable',
+    'No supported BLE telemetry characteristic found': 'errors.noSupportedCharacteristic'
+  };
+
+  if (exactKeys[value]) {
+    return t(exactKeys[value]);
+  }
+
+  const sessionFailure = value.match(/^Session creation failed \(([^)]+)\)$/);
+  if (sessionFailure) {
+    return t('errors.sessionCreationFailed', { status: sessionFailure[1] });
+  }
+
+  return value;
 }
 
 function readMetricSelections() {
