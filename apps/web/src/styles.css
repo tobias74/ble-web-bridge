@@ -1603,15 +1603,6 @@ select:focus-visible {
 }
 
 @media (max-width: 620px) {
-  .github-ribbon {
-    width: 42px;
-    padding: 0;
-  }
-
-  .github-ribbon-compact-label {
-    display: none;
-  }
-
   .system-bar {
     grid-template-columns: minmax(0, 1fr);
   }

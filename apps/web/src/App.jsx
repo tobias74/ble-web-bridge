@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Copy,
   Gauge,
-  Github,
   HeartPulse,
   Languages,
   Link,
@@ -718,7 +717,6 @@ export default function App({ plugins = [] }) {
               target="_blank"
               title={t('github.open')}
             >
-              <Github size={17} aria-hidden="true" />
               <span className="github-ribbon-label">Fork me on GitHub</span>
               <span className="github-ribbon-compact-label">GitHub</span>
             </a>
