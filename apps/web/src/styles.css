@@ -265,22 +265,6 @@ a.system-status:hover {
   background: rgba(15, 118, 110, 0.06);
 }
 
-.system-status-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  color: #7b837e;
-  background: rgba(89, 97, 92, 0.09);
-}
-
-.system-status-icon.online {
-  color: #0f766e;
-  background: rgba(15, 118, 110, 0.12);
-}
-
 .system-status-body {
   min-width: 0;
   display: flex;
@@ -1046,6 +1030,31 @@ button:active {
   color: #8b928e;
 }
 
+.metric-routing-card.is-admin-disabled {
+  border-left-color: #a5aca8;
+  background: rgba(89, 97, 92, 0.055);
+}
+
+.metric-routing-card.is-admin-disabled .metric-routing-label,
+.metric-routing-card.is-admin-disabled .metric-routing-source > span {
+  color: #7b837e;
+}
+
+.metric-routing-card.is-admin-disabled .metric-routing-source select:disabled {
+  border-color: rgba(23, 25, 23, 0.1);
+  background: #f0f2f0;
+  color: #747b77;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.metric-privacy-note {
+  color: #68706b;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
 .metrics-empty {
   border: 0;
   border-radius: 0;
@@ -1225,19 +1234,9 @@ button:active {
   padding: 18px;
 }
 
-.about-icon {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: #0f766e;
-  color: #fff;
-}
-
 .about-card h4,
 .about-notes h3 {
-  margin: 14px 0 7px;
+  margin: 0 0 7px;
   color: #171917;
   font-size: 1rem;
 }

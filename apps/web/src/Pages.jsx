@@ -1,4 +1,4 @@
-import { Bluetooth, Gamepad2, RadioTower, Settings2, ShieldCheck } from 'lucide-react';
+import { Settings2, ShieldCheck } from 'lucide-react';
 
 import PrivacyDe from './content/PrivacyDe.jsx';
 import PrivacyEn from './content/PrivacyEn.jsx';
@@ -19,12 +19,7 @@ export function InformationPage({ page }) {
 
 function AboutPage() {
   const { t } = useI18n();
-  const steps = [
-    ['connect', Bluetooth],
-    ['normalize', Settings2],
-    ['relay', RadioTower],
-    ['control', Gamepad2]
-  ];
+  const steps = ['connect', 'normalize', 'relay', 'control'];
 
   return (
     <section className="content-page" aria-labelledby="about-title">
@@ -36,9 +31,8 @@ function AboutPage() {
 
       <h3 className="section-heading">{t('about.howTitle')}</h3>
       <div className="about-grid">
-        {steps.map(([key, Icon]) => (
+        {steps.map((key) => (
           <article className="about-card" key={key}>
-            <div className="about-icon"><Icon size={22} /></div>
             <h4>{t(`about.${key}Title`)}</h4>
             <p>{t(`about.${key}Text`)}</p>
           </article>

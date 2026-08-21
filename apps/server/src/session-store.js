@@ -129,7 +129,7 @@ export class MemoryBridgeStore {
     }
 
     channel.lastBridgeSeenAt = now;
-    channel.latestTelemetry = sanitizeTelemetry(telemetry, now);
+    channel.latestTelemetry = sanitizeTelemetry(telemetry, now, this.config);
     return { ok: true, telemetry: channel.latestTelemetry };
   }
 
@@ -277,7 +277,7 @@ function createRuntimeChannel(code, now) {
   };
 }
 
-function sanitizeTelemetry(input, now) {
+function sanitizeTelemetry(input, now, config = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('telemetry must be an object');
   }
@@ -296,6 +296,9 @@ function sanitizeTelemetry(input, now) {
   for (const [key, value] of Object.entries(input.sources)) {
     const source = sanitizeSource(key, value, timestampMs);
     if (source) {
+      if (config.heartRateEnabled !== true) {
+        delete source.values.heartBpm;
+      }
       sources[source.sourceId] = source;
     }
   }

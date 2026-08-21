@@ -69,6 +69,12 @@ export function createApp(options = {}) {
     now: Date.now()
   }));
 
+  app.get('/v1/config', async () => ({
+    features: {
+      heartRate: config.heartRateEnabled === true
+    }
+  }));
+
   app.get('/v1/demo/power', async () => buildDemoPowerReading());
 
   app.post('/v1/sessions/latest', async (request, reply) => {

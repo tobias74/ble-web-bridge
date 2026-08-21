@@ -9,6 +9,13 @@ const ACCEPTED_CONSENT = {
 Cypress.Commands.add('visitBridge', (options = {}) => {
   const consent = Object.hasOwn(options, 'consent') ? options.consent : ACCEPTED_CONSENT;
   const language = options.language || 'en';
+  const heartRateEnabled = Object.hasOwn(options, 'heartRateEnabled')
+    ? options.heartRateEnabled
+    : true;
+
+  cy.intercept('GET', '/v1/config', {
+    features: { heartRate: heartRateEnabled }
+  });
 
   return cy.visit(options.path || '/', {
     onBeforeLoad(win) {

@@ -6,8 +6,8 @@ describe('GATT devices, telemetry sources, and remote control', () => {
       expect(bridgeSockets(win)).to.have.length(0);
     });
     cy.get('.device-workflow-panel')
-      .should('contain', 'Connect device')
-      .and('not.contain', 'No BLE devices connected')
+      .should('contain', 'Connect Bluetooth device')
+      .and('not.contain', 'No Bluetooth device connected')
       .and('not.contain', 'Assign measurements')
       .and('not.contain', 'Devices & measurements');
     cy.get('.step-index').should('not.exist');
@@ -39,7 +39,7 @@ describe('GATT devices, telemetry sources, and remote control', () => {
     });
     cy.get('.session-panel').should('not.exist');
     cy.get('.scan-service-list').should('not.exist');
-    cy.contains('button', 'Connect device').click();
+    cy.contains('button', 'Connect Bluetooth device').click();
     cy.get('[role="dialog"]').should('contain', 'GATT Services');
     cy.get('.scan-service-toggle').then(($services) => {
       const first = $services[0].getBoundingClientRect();
@@ -49,13 +49,13 @@ describe('GATT devices, telemetry sources, and remote control', () => {
     });
 
     cy.get('.scan-service-list input').uncheck();
-    cy.contains('button', 'Scan').should('be.disabled');
+    cy.contains('button', 'Scan for Bluetooth devices').should('be.disabled');
     cy.get('[data-service-key="cyclingPower"] input').check();
-    cy.contains('label', 'Scan all devices').find('input').check();
-    cy.contains('button', 'Scan').click();
+    cy.contains('label', 'Show all Bluetooth devices').find('input').check();
+    cy.contains('button', 'Scan for Bluetooth devices').click();
     cy.get('[role="dialog"]').should('not.exist');
 
-    cy.get('.device-connection-state').should('contain', 'BLE device connected');
+    cy.get('.device-connection-state').should('contain', 'Bluetooth device connected');
     cy.get('#metric-routing-title').should('contain', 'Assign measurements');
     cy.contains('button', 'Disconnect device').should('be.visible');
     cy.window().then((win) => {
@@ -68,9 +68,9 @@ describe('GATT devices, telemetry sources, and remote control', () => {
 
   it('selects, persists, and disconnects metric sources', () => {
     cy.visitBridge();
-    cy.contains('button', 'Connect device').click();
-    cy.contains('button', 'Scan').click();
-    cy.get('.device-connection-state').should('contain', 'BLE device connected');
+    cy.contains('button', 'Connect Bluetooth device').click();
+    cy.contains('button', 'Scan for Bluetooth devices').click();
+    cy.get('.device-connection-state').should('contain', 'Bluetooth device connected');
     cy.get('.bridge-status').should('contain', 'Streaming');
 
     emitMeasurements();
@@ -132,8 +132,8 @@ describe('GATT devices, telemetry sources, and remote control', () => {
     });
 
     cy.contains('button', 'Disconnect device').click();
-    cy.get('.device-connection-state').should('not.contain', 'No BLE devices connected');
-    cy.contains('button', 'Connect device').should('be.visible');
+    cy.get('.device-connection-state').should('not.contain', 'No Bluetooth device connected');
+    cy.contains('button', 'Connect Bluetooth device').should('be.visible');
     cy.get('#metric-routing-title').should('not.exist');
     cy.get('.bridge-status').should('contain', 'Idle');
     cy.get('.system-transmission-button').should('be.disabled');
@@ -143,13 +143,42 @@ describe('GATT devices, telemetry sources, and remote control', () => {
     });
   });
 
+  it('shows available Heart Rate as privacy-disabled and never transmits it when the administrator flag is off', () => {
+    cy.visitBridge({ heartRateEnabled: false });
+    cy.contains('button', 'Connect Bluetooth device').click();
+    cy.contains('button', 'Scan for Bluetooth devices').click();
+
+    emitMeasurements();
+
+    cy.get('[data-metric-key="powerW"]').should('contain', '210 W');
+    cy.get('[data-metric-key="heartBpm"]')
+      .should('have.attr', 'aria-disabled', 'true')
+      .and('contain', 'Privacy: Heart Rate is disabled by the server administrator and is not transmitted.')
+      .within(() => {
+        cy.get('.metric-live-value').should('contain', '—');
+        cy.get('select')
+          .should('be.disabled')
+          .and('contain', 'Disabled by the server administrator');
+      });
+
+    cy.wait(350);
+    cy.window().then((win) => {
+      const socket = bridgeSockets(win).at(-1);
+      const telemetry = socket.sent.map((payload) => JSON.parse(payload)).at(-1);
+      expect(telemetry.selected).not.to.have.property('heartBpm');
+      Object.values(telemetry.sources).forEach((source) => {
+        expect(source.values).not.to.have.property('heartBpm');
+      });
+    });
+  });
+
   it('blocks commands without consent and applies them after remote control is enabled', () => {
     cy.visitBridge();
     cy.get('.commands-panel').should('not.exist');
-    cy.contains('button', 'Connect device').click();
-    cy.contains('button', 'Scan').click();
+    cy.contains('button', 'Connect Bluetooth device').click();
+    cy.contains('button', 'Scan for Bluetooth devices').click();
     cy.get('.bridge-status').should('contain', 'Streaming');
-    cy.get('.device-connection-state').should('contain', 'BLE device connected');
+    cy.get('.device-connection-state').should('contain', 'Bluetooth device connected');
 
     cy.get('.measurement-column').then(($metrics) => {
       cy.get('.remote-control-panel').then(($remoteControl) => {

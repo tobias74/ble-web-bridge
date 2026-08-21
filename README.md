@@ -57,6 +57,14 @@ Or use Compose:
 docker compose up --build
 ```
 
+Heart Rate telemetry is disabled by default. A server administrator can enable it explicitly:
+
+```bash
+HEART_RATE_ENABLED=true docker compose up --build
+```
+
+When disabled, the browser still indicates that Heart Rate is available from a connected GATT device, but keeps the measurement disabled and does not transmit its value. The relay also removes `heartBpm` from incoming telemetry as a server-side safeguard.
+
 The container serves the built bridge UI at `http://localhost:8787/` and keeps relay APIs and WebSockets under `/v1/*`. Localhost works for Web Bluetooth; remote deployments need HTTPS in front of the container.
 
 ## Tests
@@ -126,6 +134,7 @@ BLE_BRIDGE_PLUGIN_CONFIG=/absolute/path/ble-bridge.plugins.json npm run build
 GET  /v1/sessions/:code/latest
 POST /v1/sessions/latest
 POST /v1/sessions/:code/commands
+GET  /v1/config
 GET  /v1/health
 GET  /v1/demo/power
 WS   /v1/sessions/:code/bridge
@@ -181,7 +190,7 @@ Latest telemetry is source-first:
 
 ## Current Scope
 
-- Multi-device BLE telemetry from FTMS, Running Speed/Cadence, Cycling Power, Cycling Speed/Cadence, Heart Rate, Battery, and Device Information services.
+- Multi-device BLE telemetry from FTMS, Running Speed/Cadence, Cycling Power, Cycling Speed/Cadence, Battery, and Device Information services, with administrator-enabled Heart Rate telemetry.
 - Standalone Three.js demo game that polls source-first telemetry and can optionally send bike grade commands.
 - Opt-in FTMS indoor-bike control for grade and resistance.
 - Treadmill control commands are blocked and surfaced as browser warnings.

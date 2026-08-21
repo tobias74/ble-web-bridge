@@ -1,5 +1,23 @@
 # BLE Bridge Protocol
 
+## Runtime features
+
+Read the public server feature configuration:
+
+```http
+GET /v1/config
+```
+
+```json
+{
+  "features": {
+    "heartRate": false
+  }
+}
+```
+
+Heart Rate telemetry is disabled unless the server administrator sets `HEART_RATE_ENABLED=true`. When disabled, the browser omits `heartBpm` from both `selected` and every source `values` object. The relay applies the same filter to incoming telemetry before retaining it in memory or returning it to consumers.
+
 ## Connection-code lifecycle
 
 The browser creates a readable connection code locally, for example:

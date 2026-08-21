@@ -61,6 +61,25 @@ test('returns 404 for an unknown session', async (t) => {
   assert.deepEqual(await response.json(), { error: 'session_not_found' });
 });
 
+test('publishes the administrator Heart Rate feature flag with a disabled default', async (t) => {
+  const disabledServer = await startTestServer();
+  t.after(disabledServer.close);
+
+  const disabledResponse = await fetch(`${disabledServer.baseUrl}/v1/config`);
+  assert.equal(disabledResponse.status, 200);
+  assert.deepEqual(await disabledResponse.json(), {
+    features: { heartRate: false }
+  });
+
+  const enabledServer = await startTestServer({ heartRateEnabled: true });
+  t.after(enabledServer.close);
+
+  const enabledResponse = await fetch(`${enabledServer.baseUrl}/v1/config`);
+  assert.deepEqual(await enabledResponse.json(), {
+    features: { heartRate: true }
+  });
+});
+
 test('serves built web app and keeps API routes as JSON', async (t) => {
   const webDistDir = await createStaticWebDist(t);
   const { baseUrl, close } = await startTestServer({ webDistDir });
@@ -225,6 +244,57 @@ test('stores selected metrics alongside source telemetry', async (t) => {
   assert.equal(latest.selected.powerW.value, 235);
   assert.equal(latest.selected.powerW.connected, true);
   assert.equal(latest.selected.cadenceRpm, undefined);
+});
+
+test('filters Heart Rate telemetry by default even when a bridge submits it', async (t) => {
+  const { baseUrl, close } = await startTestServer();
+  t.after(close);
+  const session = await createSession(baseUrl);
+  const ws = new WebSocket(session.bridgeWsUrl);
+  t.after(() => ws.close());
+
+  await waitForReady(ws);
+  ws.send(JSON.stringify(telemetryEnvelope({
+    'dev_1:ftms.indoor_bike': sourceTelemetry('ftms.indoor_bike', {
+      powerW: 211,
+      heartBpm: 153
+    })
+  }, Date.now(), {
+    heartBpm: {
+      sourceId: 'dev_1:ftms.indoor_bike',
+      value: 153
+    }
+  })));
+  await waitForMessage(ws);
+
+  const latest = await (await fetch(`${baseUrl}/v1/sessions/${session.code}/latest`)).json();
+  assert.deepEqual(latest.sources['dev_1:ftms.indoor_bike'].values, { powerW: 211 });
+  assert.equal(latest.selected.heartBpm, undefined);
+});
+
+test('retains Heart Rate telemetry when the administrator enables it', async (t) => {
+  const { baseUrl, close } = await startTestServer({ heartRateEnabled: true });
+  t.after(close);
+  const session = await createSession(baseUrl);
+  const ws = new WebSocket(session.bridgeWsUrl);
+  t.after(() => ws.close());
+
+  await waitForReady(ws);
+  ws.send(JSON.stringify(telemetryEnvelope({
+    'dev_1:heart_rate': sourceTelemetry('heart_rate', {
+      heartBpm: 153
+    })
+  }, Date.now(), {
+    heartBpm: {
+      sourceId: 'dev_1:heart_rate',
+      value: 153
+    }
+  })));
+  await waitForMessage(ws);
+
+  const latest = await (await fetch(`${baseUrl}/v1/sessions/${session.code}/latest`)).json();
+  assert.equal(latest.sources['dev_1:heart_rate'].values.heartBpm, 153);
+  assert.equal(latest.selected.heartBpm.value, 153);
 });
 
 test('rejects legacy flat websocket telemetry', async (t) => {

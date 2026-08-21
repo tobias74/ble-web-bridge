@@ -10,6 +10,7 @@ services:
       HOST: 0.0.0.0
       PORT: 8787
       WEB_DIST_DIR: /app/apps/web/dist
+      HEART_RATE_ENABLED: ${HEART_RATE_ENABLED:-false}
       IDLE_TTL_MS: ${IDLE_TTL_MS:-60000}
       STALE_MS: ${STALE_MS:-10000}
       CLEANUP_INTERVAL_MS: ${CLEANUP_INTERVAL_MS:-15000}

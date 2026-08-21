@@ -7,6 +7,7 @@ export const DEFAULT_CONFIG = {
   port: Number(process.env.PORT || 8787),
   webDistDir: process.env.WEB_DIST_DIR || DEFAULT_WEB_DIST_DIR,
   pluginManifestPath: process.env.BLE_PLUGIN_MANIFEST_PATH || '',
+  heartRateEnabled: parseBoolean(process.env.HEART_RATE_ENABLED, false),
   idleTtlMs: Number(process.env.IDLE_TTL_MS || 60 * 1000),
   staleMs: Number(process.env.STALE_MS || 10 * 1000),
   cleanupIntervalMs: Number(process.env.CLEANUP_INTERVAL_MS || 15 * 1000),
@@ -17,3 +18,11 @@ export const DEFAULT_CONFIG = {
   maxBatchCodes: Number(process.env.MAX_BATCH_CODES || 50),
   maxPayloadBytes: Number(process.env.MAX_PAYLOAD_BYTES || 4 * 1024)
 };
+
+function parseBoolean(value, fallback) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}

@@ -1,7 +1,6 @@
 import {
   Activity,
   AlertTriangle,
-  Bluetooth,
   Check,
   ChevronDown,
   Copy,
@@ -11,7 +10,6 @@ import {
   Link,
   Pause,
   Play,
-  Radio,
   RefreshCw,
   Unplug,
   X,
@@ -39,6 +37,12 @@ import { APP_PAGES, pageFromHash, pageHref } from './navigation.js';
 import { InformationPage } from './Pages.jsx';
 import { PrivacyConsentDialog } from './PrivacyConsentDialog.jsx';
 import { readPrivacyConsent, writePrivacyConsent } from './privacy-consent.js';
+import {
+  DEFAULT_RUNTIME_FEATURES,
+  applyRuntimeFeaturesToTelemetry,
+  loadRuntimeFeatures,
+  metricEnabledByRuntimeFeatures
+} from './runtime-features.js';
 import {
   clearStoredConnectionSession,
   readStoredConnectionSession,
@@ -132,6 +136,7 @@ export default function App({ plugins = [] }) {
   const [recentCommands, setRecentCommands] = useState([]);
   const [sessionError, setSessionError] = useState('');
   const [deviceError, setDeviceError] = useState('');
+  const [runtimeFeatures, setRuntimeFeatures] = useState(DEFAULT_RUNTIME_FEATURES);
   const [isDeviceConnectionDialogVisible, setDeviceConnectionDialogVisible] = useState(false);
 
   const wsRef = useRef(null);
@@ -150,6 +155,20 @@ export default function App({ plugins = [] }) {
   useEffect(() => {
     sourceRef.current = sources;
   }, [sources]);
+
+  useEffect(() => {
+    let active = true;
+
+    loadRuntimeFeatures().then((features) => {
+      if (active) {
+        setRuntimeFeatures(features);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionError !== 'rate_limited') {
@@ -224,12 +243,13 @@ export default function App({ plugins = [] }) {
         sourceRef.current,
         selectedMetricSourcesRef.current,
         {},
-        metricProtocolPriorities
+        metricProtocolPriorities,
+        runtimeFeatures
       ));
     }, SEND_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [socketState, streaming, metricProtocolPriorities]);
+  }, [socketState, streaming, metricProtocolPriorities, runtimeFeatures]);
 
   useEffect(() => () => {
     manualCloseRef.current = true;
@@ -258,8 +278,8 @@ export default function App({ plugins = [] }) {
 
   const sourceList = useMemo(() => sortSources(sources), [sources]);
   const metricSelectionRows = useMemo(() => (
-    createMetricSelectionRows(sourceList, selectedMetricSources, {}, metricProtocolPriorities, t)
-  ), [sourceList, selectedMetricSources, metricProtocolPriorities, t]);
+    createMetricSelectionRows(sourceList, selectedMetricSources, {}, metricProtocolPriorities, runtimeFeatures, t)
+  ), [sourceList, selectedMetricSources, metricProtocolPriorities, runtimeFeatures, t]);
   const controlTargets = useMemo(() => (
     collectControlTargets(devices, deviceHandlesRef.current)
   ), [devices]);
@@ -728,9 +748,6 @@ export default function App({ plugins = [] }) {
         <a className="system-status ble-system-status" href={pageHref('bridge')}>
           <small className="system-status-heading">{t('devices.statusLabel')}</small>
           <span className="system-status-body">
-            <span className={`system-status-icon${hasConnectedDevice ? ' online' : ''}`} aria-hidden="true">
-              <Bluetooth size={18} />
-            </span>
             <strong>{t(hasConnectedDevice ? 'devices.connected' : 'devices.none')}</strong>
           </span>
         </a>
@@ -843,7 +860,6 @@ export default function App({ plugins = [] }) {
                 onClick={() => setDeviceConnectionDialogVisible(true)}
                 type="button"
               >
-                <Bluetooth size={18} aria-hidden="true" />
                 <span>{t(deviceConnectionInProgress
                   ? 'devices.connectingAction'
                   : 'devices.connectAction')}</span>
@@ -1017,7 +1033,6 @@ function DeviceConnectionDialog({
             onClick={onScan}
             type="button"
           >
-            <Bluetooth size={18} />
             <span>{t('devices.scan')}</span>
           </button>
         </div>
@@ -1036,7 +1051,12 @@ function MetricRoutingPanel({ rows, onChange }) {
   return (
     <div className="metric-routing-grid">
       {rows.map((row) => (
-        <article className={`metric-routing-card ${row.tone}${row.isDisabled ? ' is-disabled' : ''}`} data-metric-key={row.key} key={row.key}>
+        <article
+          aria-disabled={row.disabledByAdministrator || undefined}
+          className={`metric-routing-card ${row.tone}${row.isDisabled ? ' is-disabled' : ''}${row.disabledByAdministrator ? ' is-admin-disabled' : ''}`}
+          data-metric-key={row.key}
+          key={row.key}
+        >
           <div className="metric-routing-main">
             <div className="metric-routing-label">
               <div className="metric-icon" aria-hidden="true">{metricIcon(row.icon)}</div>
@@ -1049,6 +1069,7 @@ function MetricRoutingPanel({ rows, onChange }) {
             <span>{t('metrics.gattSource')}</span>
             <select
               aria-label={t('metrics.sourceFor', { metric: row.label })}
+              disabled={row.disabledByAdministrator}
               value={row.value}
               onChange={(event) => onChange(row.key, event.target.value)}
             >
@@ -1058,6 +1079,9 @@ function MetricRoutingPanel({ rows, onChange }) {
                 </option>
               ))}
             </select>
+            {row.disabledByAdministrator ? (
+              <small className="metric-privacy-note">{t('metrics.heartRatePrivacyDisabled')}</small>
+            ) : null}
           </label>
         </article>
       ))}
@@ -1188,7 +1212,6 @@ function CommandHistoryPanel({ commands, plugins }) {
   return (
     <div className="panel commands-panel">
       <div className="panel-title">
-        <Radio size={18} />
         <span>{t('commands.title')}</span>
       </div>
 
@@ -1214,10 +1237,16 @@ function CommandHistoryPanel({ commands, plugins }) {
   );
 }
 
-function createBridgeTelemetry(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES) {
+function createBridgeTelemetry(
+  sources,
+  selectedMetricSources = {},
+  disabledMetricSources = {},
+  metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES,
+  runtimeFeatures = DEFAULT_RUNTIME_FEATURES
+) {
   const sourceList = sortSources(sources);
 
-  return {
+  return applyRuntimeFeaturesToTelemetry({
     schemaVersion: 2,
     timestampMs: Date.now(),
     selected: createSelectedTelemetry(sourceList, selectedMetricSources, disabledMetricSources, metricProtocolPriorities),
@@ -1235,7 +1264,7 @@ function createBridgeTelemetry(sources, selectedMetricSources = {}, disabledMetr
         raw: source.raw || {}
       }
     ]))
-  };
+  }, runtimeFeatures);
 }
 
 function createCommandEntry(command) {
@@ -1358,7 +1387,14 @@ function mergeMetricProtocolPriorities(pluginPriorities = {}) {
   return merged;
 }
 
-function createMetricSelectionRows(sources, selectedMetricSources = {}, disabledMetricSources = {}, metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES, t) {
+function createMetricSelectionRows(
+  sources,
+  selectedMetricSources = {},
+  disabledMetricSources = {},
+  metricProtocolPriorities = METRIC_PROTOCOL_PRIORITIES,
+  runtimeFeatures = DEFAULT_RUNTIME_FEATURES,
+  t
+) {
   const rows = [];
 
   for (const key of SUMMARY_METRIC_KEYS) {
@@ -1380,33 +1416,40 @@ function createMetricSelectionRows(sources, selectedMetricSources = {}, disabled
       ? choices.find((source) => sourcePreferenceKey(source) === selectedPreferenceKey)
       : null;
     const defaultPreferenceKey = defaultSource ? sourcePreferenceKey(defaultSource) : '';
+    const disabledByAdministrator = !metricEnabledByRuntimeFeatures(key, runtimeFeatures);
 
     rows.push({
       key,
       icon: metricIconName(key),
       label: valueLabel(key, t),
       tone: metricTone(key),
-      value: selectedPreferenceKey === DISABLED_METRIC_SOURCE_VALUE
+      value: disabledByAdministrator || selectedPreferenceKey === DISABLED_METRIC_SOURCE_VALUE
         ? DISABLED_METRIC_SOURCE_VALUE
         : selectedChoice && sourcePreferenceKey(selectedChoice) !== defaultPreferenceKey
           ? sourcePreferenceKey(selectedChoice)
           : DEFAULT_METRIC_SOURCE_VALUE,
-      isDisabled: selectedPreferenceKey === DISABLED_METRIC_SOURCE_VALUE,
-      currentValue: selectedSource ? formatValue(key, selectedSource.values[key]) : '—',
-      choices: [
-        ...choices.map((source) => ({
-          preferenceKey: sourcePreferenceKey(source) === defaultPreferenceKey
-            ? DEFAULT_METRIC_SOURCE_VALUE
-            : sourcePreferenceKey(source),
-          label: sourcePreferenceKey(source) === defaultPreferenceKey
-            ? `${sourceName(source, t)} (${t('metrics.automatic')})`
-            : sourceName(source, t)
-        })),
-        {
-          preferenceKey: DISABLED_METRIC_SOURCE_VALUE,
-          label: t('metrics.disabled')
-        }
-      ]
+      isDisabled: disabledByAdministrator || selectedPreferenceKey === DISABLED_METRIC_SOURCE_VALUE,
+      disabledByAdministrator,
+      currentValue: !disabledByAdministrator && selectedSource ? formatValue(key, selectedSource.values[key]) : '—',
+      choices: disabledByAdministrator
+        ? [{
+            preferenceKey: DISABLED_METRIC_SOURCE_VALUE,
+            label: t('metrics.disabledByAdministrator')
+          }]
+        : [
+            ...choices.map((source) => ({
+              preferenceKey: sourcePreferenceKey(source) === defaultPreferenceKey
+                ? DEFAULT_METRIC_SOURCE_VALUE
+                : sourcePreferenceKey(source),
+              label: sourcePreferenceKey(source) === defaultPreferenceKey
+                ? `${sourceName(source, t)} (${t('metrics.automatic')})`
+                : sourceName(source, t)
+            })),
+            {
+              preferenceKey: DISABLED_METRIC_SOURCE_VALUE,
+              label: t('metrics.disabled')
+            }
+          ]
     });
   }
 

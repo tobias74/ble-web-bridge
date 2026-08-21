@@ -72,7 +72,7 @@ describe('privacy, language, and navigation', () => {
     cy.contains('nav a', 'Privacy').click();
     cy.hash().should('equal', '#privacy');
     cy.get('#privacy-title').should('contain', 'Privacy');
-    cy.get('.system-bar').should('contain', 'BLE connection').and('be.visible');
+    cy.get('.system-bar').should('contain', 'Bluetooth connection').and('be.visible');
 
     cy.contains('nav a', 'Imprint').click();
     cy.hash().should('equal', '#imprint');

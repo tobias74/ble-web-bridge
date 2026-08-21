@@ -14,7 +14,7 @@ describe('relay sessions', () => {
 
     cy.get('.system-bar .session-code span').invoke('text').should('match', /^[A-Z]{6,24}-\d{6}$/);
     cy.get('.bridge-status').should('contain', 'Streaming');
-    cy.get('.system-bar').should('contain', 'BLE connection');
+    cy.get('.system-bar').should('contain', 'Bluetooth connection');
     cy.get('.session-panel').should('not.exist');
     cy.contains('button', 'Start session').should('not.exist');
     cy.get('.session-code-value > span').should('have.css', 'text-align', 'center');
@@ -165,9 +165,9 @@ describe('relay sessions', () => {
 });
 
 function connectDevice() {
-  cy.contains('button', 'Connect device').click();
-  cy.contains('button', 'Scan').click();
-  cy.get('.device-connection-state').should('contain', 'BLE device connected');
+  cy.contains('button', 'Connect Bluetooth device').click();
+  cy.contains('button', 'Scan for Bluetooth devices').click();
+  cy.get('.device-connection-state').should('contain', 'Bluetooth device connected');
 }
 
 function bridgeSockets(win) {
