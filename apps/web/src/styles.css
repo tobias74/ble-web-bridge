@@ -1,7 +1,7 @@
 :root {
   color: #171917;
   background: #f4f6f5;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   overflow-y: scroll;
   scrollbar-gutter: stable;
@@ -17,6 +17,10 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: linear-gradient(135deg, #f8faf8 0%, #eef4f1 48%, #f6eee8 100%);
+}
+
+body.has-open-dialog {
+  overflow: hidden;
 }
 
 button,
@@ -173,6 +177,40 @@ button {
 
 .language-select:focus-within .language-chevron {
   transform: translateY(1px);
+}
+
+.github-ribbon {
+  position: fixed;
+  top: 30px;
+  right: -52px;
+  z-index: 30;
+  width: 210px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  transform: rotate(45deg);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #303633;
+  box-shadow: 0 8px 24px rgba(23, 25, 23, 0.2);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.github-ribbon:hover {
+  background: #0f766e;
+  color: #fff;
+}
+
+.github-ribbon-compact-label {
+  display: none;
 }
 
 .visually-hidden {
@@ -1450,6 +1488,7 @@ button:active {
 
 .app-nav a:focus-visible,
 .brand-link:focus-visible,
+.github-ribbon:focus-visible,
 a.system-status:focus-visible,
 .language-select select:focus-visible,
 .language-select:focus-within,
@@ -1458,6 +1497,38 @@ input:focus-visible,
 select:focus-visible {
   outline: 3px solid rgba(15, 118, 110, 0.3);
   outline-offset: 2px;
+}
+
+@media (max-width: 1320px) {
+  .github-ribbon {
+    position: static;
+    width: auto;
+    min-height: 38px;
+    flex: 0 0 auto;
+    margin-left: 4px;
+    border: 0;
+    border-left: 1px solid rgba(23, 25, 23, 0.1);
+    border-radius: 0 7px 7px 0;
+    padding: 0 10px;
+    transform: none;
+    background: transparent;
+    box-shadow: none;
+    color: #4a514d;
+    font-size: 0.8rem;
+  }
+
+  .github-ribbon:hover {
+    background: rgba(15, 118, 110, 0.07);
+    color: #0f4f49;
+  }
+
+  .github-ribbon-label {
+    display: none;
+  }
+
+  .github-ribbon-compact-label {
+    display: inline;
+  }
 }
 
 @media (max-width: 980px) {
@@ -1532,6 +1603,15 @@ select:focus-visible {
 }
 
 @media (max-width: 620px) {
+  .github-ribbon {
+    width: 42px;
+    padding: 0;
+  }
+
+  .github-ribbon-compact-label {
+    display: none;
+  }
+
   .system-bar {
     grid-template-columns: minmax(0, 1fr);
   }

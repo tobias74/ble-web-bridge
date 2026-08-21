@@ -10,6 +10,28 @@ import Fastify from 'fastify';
 import { DEFAULT_CONFIG } from './config.js';
 import { MemoryBridgeStore, normalizeCode } from './session-store.js';
 
+const SELF_HOSTED_SECURITY_HEADERS = Object.freeze({
+  'content-security-policy': [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    "manifest-src 'self'",
+    "media-src 'self'",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "worker-src 'self'"
+  ].join('; '),
+  'permissions-policy': 'bluetooth=(self)',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY'
+});
+
 export function createApp(options = {}) {
   const config = { ...DEFAULT_CONFIG, ...options };
   const pluginCommandSchemas = options.pluginCommandSchemas || loadPluginCommandSchemas(
@@ -29,6 +51,11 @@ export function createApp(options = {}) {
 
   app.decorate('bridgeStore', store);
   app.decorate('bridgeConfig', config);
+
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.headers(SELF_HOSTED_SECURITY_HEADERS);
+    return payload;
+  });
 
   app.register(cors, {
     origin: true,

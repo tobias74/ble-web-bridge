@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Copy,
   Gauge,
+  Github,
   HeartPulse,
   Languages,
   Link,
@@ -708,6 +709,19 @@ export default function App({ plugins = [] }) {
                 <option value="de">{t('language.german')}</option>
               </select>
             </label>
+
+            <a
+              aria-label={t('github.open')}
+              className="github-ribbon"
+              href="https://github.com/tobias74/ble-web-bridge"
+              rel="noreferrer"
+              target="_blank"
+              title={t('github.open')}
+            >
+              <Github size={17} aria-hidden="true" />
+              <span className="github-ribbon-label">Fork me on GitHub</span>
+              <span className="github-ribbon-compact-label">GitHub</span>
+            </a>
           </div>
         </div>
       </header>
@@ -915,22 +929,19 @@ function DeviceConnectionDialog({
       return undefined;
     }
 
-    const previousOverflow = globalThis.document?.body?.style?.overflow;
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         onCancel();
       }
     };
 
-    globalThis.document?.body?.style?.setProperty('overflow', 'hidden');
+    globalThis.document?.body?.classList?.add('has-open-dialog');
     globalThis.document?.addEventListener('keydown', handleKeyDown);
     dialogRef.current?.focus();
 
     return () => {
       globalThis.document?.removeEventListener('keydown', handleKeyDown);
-      if (globalThis.document?.body?.style) {
-        globalThis.document.body.style.overflow = previousOverflow || '';
-      }
+      globalThis.document?.body?.classList?.remove('has-open-dialog');
     };
   }, [isVisible]);
 

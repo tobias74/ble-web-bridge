@@ -53,6 +53,11 @@ describe('privacy, language, and navigation', () => {
   it('navigates through the public information pages', () => {
     cy.visitBridge();
 
+    cy.get('a.github-ribbon')
+      .should('be.visible')
+      .and('have.attr', 'href', 'https://github.com/tobias74/ble-web-bridge')
+      .and('have.attr', 'target', '_blank');
+
     cy.get('.app-nav a.active').should(($active) => {
       const style = getComputedStyle($active[0]);
       expect(style.backgroundColor).to.equal('rgb(232, 236, 234)');

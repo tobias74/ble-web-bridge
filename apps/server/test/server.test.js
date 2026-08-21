@@ -69,6 +69,11 @@ test('serves built web app and keeps API routes as JSON', async (t) => {
   const root = await fetch(`${baseUrl}/`);
   assert.equal(root.status, 200);
   assert.match(root.headers.get('content-type') || '', /text\/html/);
+  assert.match(root.headers.get('content-security-policy') || '', /default-src 'self'/);
+  assert.match(root.headers.get('content-security-policy') || '', /font-src 'self'/);
+  assert.match(root.headers.get('content-security-policy') || '', /connect-src 'self'/);
+  assert.equal(root.headers.get('permissions-policy'), 'bluetooth=(self)');
+  assert.equal(root.headers.get('x-content-type-options'), 'nosniff');
   assert.match(await root.text(), /BLE Bridge Test Shell/);
 
   const asset = await fetch(`${baseUrl}/assets/app.js`);

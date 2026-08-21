@@ -8,6 +8,7 @@ export default {
   'language.label': 'Language',
   'language.english': 'English',
   'language.german': 'Deutsch',
+  'github.open': 'Open BLE Bridge on GitHub',
 
   'consent.eyebrow': 'Privacy',
   'consent.title': 'Cookie settings',
