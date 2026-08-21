@@ -1,0 +1,32 @@
+{
+  "name": "ble-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source BLE telemetry relay for games and realtime apps.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/server",
+    "apps/web",
+    "apps/demo-game"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace @ble-bridge/server",
+    "dev:web": "npm run dev --workspace @ble-bridge/web",
+    "dev:demo": "npm run dev --workspace @ble-bridge/demo-game",
+    "start": "npm run start --workspace @ble-bridge/server",
+    "test": "npm run test:unit",
+    "test:unit": "npm run test --workspaces --if-present",
+    "test:e2e": "./scripts/run-cypress-e2e.sh",
+    "test:e2e:local": "start-server-and-test \"npm run dev --workspace @ble-bridge/web -- --host 127.0.0.1 --port 4173\" http://127.0.0.1:4173 \"cypress run\"",
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "devDependencies": {
+    "cypress": "^15.20.1",
+    "start-server-and-test": "^2.1.2"
+  }
+}

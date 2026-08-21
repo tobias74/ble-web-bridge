@@ -1,0 +1,42 @@
+services:
+  web:
+    image: node:22-bookworm-slim
+    user: "${BLEBRIDGE_E2E_UID:-1000}:${BLEBRIDGE_E2E_GID:-1000}"
+    working_dir: /app
+    environment:
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: web
+    command:
+      - npm
+      - run
+      - dev
+      - --workspace
+      - "@ble-bridge/web"
+      - --
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4173"
+    volumes:
+      - .:/app
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4173').then(response=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 2s
+
+  cypress:
+    image: cypress/included:15.20.1
+    working_dir: /e2e
+    environment:
+      CYPRESS_baseUrl: http://web:4173
+    ipc: host
+    depends_on:
+      web:
+        condition: service_healthy
+    volumes:
+      - .:/e2e
