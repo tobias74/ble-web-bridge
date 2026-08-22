@@ -11,6 +11,31 @@ const PrivacyEn = () => {
                 </a>.
             </p>
 
+            <h4>Transmission of device and training data through BLE Bridge</h4>
+            <p>
+                BLE Bridge reads the GATT data supplied by a connected fitness device in the browser via Web Bluetooth. After the Bluetooth connection succeeds,
+                the browser application additionally opens a connection channel to the relay server. While transmission is active, the device data read from the
+                fitness device is sent through that channel. A
+                target application, such as a game or training dashboard, can connect to the channel using the displayed connection code and receive the transmitted
+                data.
+            </p>
+            <p>
+                Data sent may include the measurements supplied by the GATT Services selected during connection, in particular power, speed, cadence, step rate,
+                distance, incline, resistance, energy, and time values. They may be accompanied by the device name, a browser-assigned device identifier, protocols
+                used, timestamps, battery level, and manufacturer, model, or software information supplied by the device. The source chosen under “Assign
+                measurements” identifies the preferred primary value; other measurements supplied by a connected source may remain available in the source data.
+                Heart Rate is disabled on the server by default and is removed before transmission while disabled. If the server-side feature is enabled, Heart Rate
+                may also be transmitted; its status is shown in the user interface.
+            </p>
+            <p>
+                The relay server does not maintain a user account for this function or create a permanent workout history. Current telemetry and routing information
+                are held temporarily in memory and are discarded when the inactive connection channel ends or expires, or when the server restarts. The connection
+                code is stored in the browser&apos;s local storage so it can be reused after revisiting the page. It acts as an access key: an application that knows
+                the code can retrieve current telemetry and send supported control commands to the browser while a connection channel is active. The browser executes
+                such commands only if the user has enabled trainer control and the device supports them. The user can regenerate the code at any time. Transmission
+                between the provided website and relay server is encrypted using HTTPS and WebSocket Secure (WSS).
+            </p>
+
             <h4>Privacy Policy</h4>
 
             <p>

@@ -11,6 +11,33 @@ const PrivacyDe = () => {
                 </a>.
             </p>
 
+            <h4>Übertragung von Geräte- und Trainingsdaten durch BLE Bridge</h4>
+            <p>
+                BLE Bridge liest die von einem verbundenen Fitnessgerät bereitgestellten GATT-Daten über Web Bluetooth im Browser aus. Nach erfolgreicher
+                Bluetooth-Verbindung öffnet die Browseranwendung zusätzlich einen Verbindungskanal zum Relay-Server. Solange die Übertragung aktiv ist, werden die
+                ausgelesenen Gerätedaten über diesen Kanal gesendet. Eine
+                Zielanwendung, beispielsweise ein Spiel oder ein Trainingsdashboard, kann sich mit dem angezeigten Verbindungscode mit diesem Kanal verbinden und
+                die übertragenen Daten empfangen.
+            </p>
+            <p>
+                Übertragen werden können die von den beim Verbindungsaufbau ausgewählten GATT Services bereitgestellten Messwerte, insbesondere Leistung,
+                Geschwindigkeit, Tritt- oder Schrittfrequenz, Distanz, Steigung, Widerstand, Energie- und Zeitwerte. Hinzukommen können der Gerätename, eine vom
+                Browser vergebene Gerätekennung, verwendete Protokolle, Zeitstempel, Batteriestand sowie vom Gerät bereitgestellte Hersteller-, Modell- und
+                Softwareinformationen. Die unter „Messwerte zuordnen“ gewählte Quelle kennzeichnet den bevorzugten Primärwert; weitere von einer verbundenen Quelle
+                gelieferte Messwerte können weiterhin im Quellendatensatz enthalten sein. Heart Rate ist serverseitig standardmäßig deaktiviert und wird in diesem
+                Fall vor der Übertragung entfernt. Ist die serverseitige Funktion aktiviert, kann auch Heart Rate übertragen werden; ihr Status wird in der
+                Benutzeroberfläche angezeigt.
+            </p>
+            <p>
+                Der Relay-Server führt für diese Funktion kein Benutzerkonto und legt keine dauerhafte Trainingshistorie an. Aktuelle Telemetrie und
+                Routinginformationen werden nur flüchtig im Arbeitsspeicher gehalten und nach Beendigung beziehungsweise Ablauf des inaktiven Verbindungskanals oder
+                bei einem Serverneustart verworfen. Der Verbindungscode wird im lokalen Browser-Speicher gespeichert, damit er nach einem erneuten Seitenaufruf
+                weiterverwendet werden kann. Er funktioniert als Zugriffsschlüssel: Eine Anwendung, die den Code kennt, kann während eines aktiven
+                Verbindungskanals die aktuelle Telemetrie abrufen und unterstützte Steuerbefehle an den Browser senden. Der Browser führt solche Befehle nur aus,
+                wenn der Nutzer die Trainersteuerung aktiviert hat und das Gerät sie unterstützt. Der Nutzer kann den Code jederzeit neu erzeugen. Die Übertragung
+                zwischen der bereitgestellten Webseite und dem Relay-Server erfolgt verschlüsselt über HTTPS und WebSocket Secure (WSS).
+            </p>
+
             <h4>Datenschutzerklärung</h4>
 
             <p>

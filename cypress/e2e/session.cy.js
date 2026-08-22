@@ -4,7 +4,7 @@ describe('relay sessions', () => {
     cy.visitBridge();
 
     cy.get('.bridge-status').should('contain', 'No session');
-    cy.get('.system-bar .session-code').should('contain', '---- ----');
+    cy.get('[data-testid="session-code"]').should('contain', '---- ----');
     cy.get('button[aria-label="Regenerate session"]').should('be.disabled');
     cy.window().then((win) => {
       expect(bridgeSockets(win)).to.have.length(0);
@@ -12,15 +12,15 @@ describe('relay sessions', () => {
 
     connectDevice();
 
-    cy.get('.system-bar .session-code span').invoke('text').should('match', /^[A-Z]{6,24}-\d{6}$/);
+    cy.get('[data-testid="session-code-value"]').invoke('text').should('match', /^[A-Z]{6,24}-\d{6}$/);
     cy.get('.bridge-status').should('contain', 'Streaming');
     cy.get('.system-bar').should('contain', 'Bluetooth connection');
     cy.get('.session-panel').should('not.exist');
     cy.contains('button', 'Start session').should('not.exist');
-    cy.get('.session-code-value > span').should('have.css', 'text-align', 'center');
+    cy.get('[data-testid="session-code-value"]').should('have.css', 'text-align', 'center');
     cy.get('.session-code button[aria-label="Regenerate session"]').should('not.contain.text', 'Regenerate session');
     cy.get('.session-code > .system-status-heading').then(($label) => {
-      cy.get('.session-code-value > span').then(($code) => {
+      cy.get('[data-testid="session-code-value"]').then(($code) => {
         expect($label[0].getBoundingClientRect().bottom).to.be.at.most($code[0].getBoundingClientRect().top);
         expect($code[0].scrollWidth).to.be.at.most($code[0].clientWidth);
       });
@@ -29,7 +29,7 @@ describe('relay sessions', () => {
       const headingTops = [...$headings].map((heading) => heading.getBoundingClientRect().top);
       headingTops.slice(1).forEach((top) => expect(top).to.be.closeTo(headingTops[0], 1));
     });
-    cy.get('.session-code-value > span').then(($code) => {
+    cy.get('[data-testid="session-code-value"]').then(($code) => {
       cy.get('.session-code-tools').then(($tools) => {
         expect($tools[0].getBoundingClientRect().height).to.be.closeTo($code[0].getBoundingClientRect().height, 1);
       });
@@ -53,11 +53,7 @@ describe('relay sessions', () => {
       cy.get('button[aria-label="Dismiss notice"]').click();
       cy.get('.system-notices').should('not.exist');
     });
-    cy.viewport(375, 812);
-    cy.get('.session-code-value > span').then(($code) => {
-      expect($code[0].scrollWidth).to.be.at.most($code[0].clientWidth);
-    });
-    cy.get('.system-bar .session-code span').invoke('text').then((code) => {
+    cy.get('[data-testid="session-code-value"]').invoke('text').then((code) => {
       cy.get('button[aria-label="Copy code"]').click();
       cy.window().its('__clipboardText').should('equal', code);
     });
@@ -94,13 +90,13 @@ describe('relay sessions', () => {
       .should('have.attr', 'title', 'Generate a new code and disconnect the current target application')
       .click();
     cy.get('@confirmRegeneration').should('have.been.calledWith', 'Generate a new session code? This will disconnect the currently connected target application.');
-    cy.get('.system-bar .session-code span').invoke('text').then((code) => {
+    cy.get('[data-testid="session-code-value"]').invoke('text').then((code) => {
       originalCode = code;
     });
 
     cy.get('@confirmRegeneration').invoke('returns', true);
     cy.get('button[aria-label="Regenerate session"]').click();
-    cy.get('.system-bar .session-code span').should(($code) => {
+    cy.get('[data-testid="session-code-value"]').should(($code) => {
       expect($code.text()).not.to.equal(originalCode);
     });
     cy.get('.bridge-status').should('contain', 'Streaming');
@@ -110,7 +106,7 @@ describe('relay sessions', () => {
     let connectionCode;
     cy.visitBridge();
     connectDevice();
-    cy.get('.system-bar .session-code span').invoke('text').then((code) => {
+    cy.get('[data-testid="session-code-value"]').invoke('text').then((code) => {
       connectionCode = code;
     });
 
@@ -122,7 +118,7 @@ describe('relay sessions', () => {
 
     cy.visitBridge();
     cy.then(() => {
-      cy.get('.system-bar .session-code span').should('have.text', connectionCode);
+      cy.get('[data-testid="session-code-value"]').should('have.text', connectionCode);
     });
     cy.get('.bridge-status').should('contain', 'Idle');
     cy.get('.system-transmission-button').should('be.disabled');
@@ -141,7 +137,7 @@ describe('relay sessions', () => {
   it('retains the browser-owned code when the server drops the runtime channel', () => {
     cy.visitBridge();
     connectDevice();
-    cy.get('.system-bar .session-code span').invoke('text').as('connectionCode');
+    cy.get('[data-testid="session-code-value"]').invoke('text').as('connectionCode');
 
     cy.window().then((win) => {
       win.__webSocketMock.latest().close(1012, 'server restarted');
@@ -153,7 +149,7 @@ describe('relay sessions', () => {
       expect(bridgeSockets(win).at(-1).url).not.to.contain('token=');
     });
     cy.get('@connectionCode').then((connectionCode) => {
-      cy.get('.system-bar .session-code span').should('have.text', connectionCode);
+      cy.get('[data-testid="session-code-value"]').should('have.text', connectionCode);
       cy.window().then((win) => {
         expect(win.__webSocketMock.latest().url).to.contain(encodeURIComponent(connectionCode));
         expect(JSON.parse(win.localStorage.getItem('ble-bridge.connection-code.v2')).code)

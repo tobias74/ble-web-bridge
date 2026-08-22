@@ -8,6 +8,7 @@ import {
   HeartPulse,
   Languages,
   Link,
+  Menu,
   Pause,
   Play,
   RefreshCw,
@@ -84,8 +85,10 @@ import {
 const SEND_INTERVAL_MS = 250;
 const HEARTBEAT_INTERVAL_MS = 5000;
 const MAX_COMMAND_HISTORY = 5;
+const MOBILE_LAYOUT_QUERY = '(max-width: 720px)';
 export default function App({ plugins = [] }) {
   const { language, setLanguage, t } = useI18n();
+  const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_QUERY);
   const [page, setPage] = useState(() => pageFromHash(globalThis.location?.hash));
   const commandDefinitions = useMemo(() => [
     ...STANDARD_COMMAND_DEFINITIONS,
@@ -138,7 +141,10 @@ export default function App({ plugins = [] }) {
   const [deviceError, setDeviceError] = useState('');
   const [runtimeFeatures, setRuntimeFeatures] = useState(DEFAULT_RUNTIME_FEATURES);
   const [isDeviceConnectionDialogVisible, setDeviceConnectionDialogVisible] = useState(false);
+  const [isMobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
+  const mobileMenuButtonRef = useRef(null);
+  const mobileNavigationRef = useRef(null);
   const wsRef = useRef(null);
   const sessionRequestInFlightRef = useRef(false);
   const sourceRef = useRef({});
@@ -182,11 +188,67 @@ export default function App({ plugins = [] }) {
   useEffect(() => {
     function handleHashChange() {
       setPage(pageFromHash(globalThis.location?.hash));
+      setMobileNavigationOpen(false);
     }
 
     globalThis.addEventListener?.('hashchange', handleHashChange);
     return () => globalThis.removeEventListener?.('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!isMobileNavigationOpen) {
+      return undefined;
+    }
+
+    const document = globalThis.document;
+    const previouslyFocused = document?.activeElement;
+    const focusFrame = globalThis.requestAnimationFrame?.(() => {
+      mobileNavigationRef.current?.querySelector('button, a, select')?.focus();
+    });
+
+    function handleNavigationKeyDown(event) {
+      if (event.key === 'Escape') {
+        setMobileNavigationOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusableElements = [...(mobileNavigationRef.current?.querySelectorAll(
+        'a[href], button:not(:disabled), select:not(:disabled)'
+      ) || [])];
+      const first = focusableElements[0];
+      const last = focusableElements.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+
+    document?.body.classList.add('has-open-mobile-navigation');
+    document?.addEventListener('keydown', handleNavigationKeyDown);
+    return () => {
+      if (focusFrame) {
+        globalThis.cancelAnimationFrame?.(focusFrame);
+      }
+      document?.body.classList.remove('has-open-mobile-navigation');
+      document?.removeEventListener('keydown', handleNavigationKeyDown);
+      if (previouslyFocused === mobileMenuButtonRef.current) {
+        mobileMenuButtonRef.current?.focus();
+      }
+    };
+  }, [isMobileNavigationOpen]);
+
+  useEffect(() => {
+    if (!isMobileLayout) {
+      setMobileNavigationOpen(false);
+    }
+  }, [isMobileLayout]);
 
   useEffect(() => {
     const pageTitle = page === 'bridge' ? 'BLE Bridge' : `${t(`nav.${page}`)} · BLE Bridge`;
@@ -670,9 +732,16 @@ export default function App({ plugins = [] }) {
     }
   }
 
-  function copySessionCode() {
-    if (session?.code) {
-      navigator.clipboard?.writeText(session.code);
+  async function copySessionCode() {
+    if (!session?.code || !navigator.clipboard?.writeText) {
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.writeText(session.code);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -686,113 +755,30 @@ export default function App({ plugins = [] }) {
     }
   }
 
+  const ApplicationLayout = isMobileLayout ? MobileApplicationLayout : DesktopApplicationLayout;
+
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div className="brand-block">
-          <a className="brand-link" href={pageHref('bridge')}>BLE Bridge</a>
-        </div>
-
-        <div className="topbar-actions">
-          <div className="appbar">
-            <nav className="app-nav" aria-label={t('nav.navigation')}>
-              {APP_PAGES.map((item) => (
-                <Fragment key={item}>
-                  <a
-                    aria-current={page === item ? 'page' : undefined}
-                    className={page === item ? 'active' : ''}
-                    href={pageHref(item)}
-                  >
-                    {t(`nav.${item}`)}
-                  </a>
-                  {item === 'privacy' ? (
-                    <button aria-haspopup="dialog" onClick={() => setPrivacyConsentVisible(true)} type="button">
-                      {t('nav.cookies')}
-                    </button>
-                  ) : null}
-                </Fragment>
-              ))}
-            </nav>
-
-            <label className="language-select" title={t('language.label')}>
-              <Languages size={18} aria-hidden="true" />
-              <span className="language-current" aria-hidden="true">{language.toUpperCase()}</span>
-              <ChevronDown className="language-chevron" size={15} aria-hidden="true" />
-              <span className="visually-hidden">{t('language.label')}</span>
-              <select
-                aria-label={t('language.label')}
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-              >
-                <option value="en">{t('language.english')}</option>
-                <option value="de">{t('language.german')}</option>
-              </select>
-            </label>
-
-            <a
-              aria-label={t('github.open')}
-              className="github-ribbon"
-              href="https://github.com/tobias74/ble-web-bridge"
-              rel="noreferrer"
-              target="_blank"
-              title={t('github.open')}
-            >
-              <span className="github-ribbon-label">Fork me on GitHub</span>
-              <span className="github-ribbon-compact-label">GitHub</span>
-            </a>
-          </div>
-        </div>
-      </header>
-
-      <section className="system-bar" aria-label={t('status.appStatus')}>
-        <a className="system-status ble-system-status" href={pageHref('bridge')}>
-          <small className="system-status-heading">{t('devices.statusLabel')}</small>
-          <span className="system-status-body">
-            <strong>{t(hasConnectedDevice ? 'devices.connected' : 'devices.none')}</strong>
-          </span>
-        </a>
-
-        <div className="system-status bridge-status">
-          <small className="system-status-heading">{t('status.transmissionLabel')}</small>
-          <div className="system-status-body">
-            <span className={`status-dot ${socketState === 'connected' ? ' online' : ''}`} aria-hidden="true" />
-            <strong>{statusLabel}</strong>
-            <button
-              className="system-transmission-button"
-              onClick={() => setStreaming((value) => !value)}
-              disabled={sessionLoading || !session || socketState !== 'connected'}
-              type="button"
-            >
-              {streaming || !session ? <Pause size={16} /> : <Play size={16} />}
-              <span>{streaming || !session ? t('session.pauseShort') : t('session.resumeShort')}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="session-code" aria-live="polite">
-          <small className="system-status-heading">{t('session.codeLabel')}</small>
-          <div className="session-code-body">
-            <div className="session-code-value">
-              <span>{session?.code || '---- ----'}</span>
-            </div>
-            <div className="session-code-tools">
-              <button className="session-code-button" onClick={copySessionCode} disabled={!session?.code} title={t('session.copyCode')} aria-label={t('session.copyCode')}>
-                <Copy size={17} aria-hidden="true" />
-              </button>
-              <button
-                className="session-code-button session-regenerate-button"
-                onClick={handleRegenerateSession}
-                disabled={sessionLoading || !session?.code}
-                title={t('session.regenerateHint')}
-                aria-label={t('session.regenerate')}
-              >
-                <RefreshCw size={17} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </section>
+    <ApplicationLayout
+      hasConnectedDevice={hasConnectedDevice}
+      isNavigationOpen={isMobileNavigationOpen}
+      language={language}
+      menuButtonRef={mobileMenuButtonRef}
+      navigationRef={mobileNavigationRef}
+      onCloseNavigation={() => setMobileNavigationOpen(false)}
+      onCopySessionCode={copySessionCode}
+      onOpenPrivacyConsent={() => setPrivacyConsentVisible(true)}
+      onRegenerateSession={handleRegenerateSession}
+      onSetLanguage={setLanguage}
+      onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}
+      onToggleStreaming={() => setStreaming((value) => !value)}
+      page={page}
+      session={session}
+      sessionLoading={sessionLoading}
+      socketState={socketState}
+      statusLabel={statusLabel}
+      streaming={streaming}
+      t={t}
+    >
 
       {sessionError || warnings.length > 0 ? <div className="system-notices">
           <button
@@ -920,8 +906,408 @@ export default function App({ plugins = [] }) {
         selectedRememberSettings={privacyConsent.rememberSettings}
         selectedTrackingAdvertising={privacyConsent.trackingAdvertising}
       />
+    </ApplicationLayout>
+  );
+}
+
+function DesktopApplicationLayout({
+  children,
+  hasConnectedDevice,
+  language,
+  onCopySessionCode,
+  onOpenPrivacyConsent,
+  onRegenerateSession,
+  onSetLanguage,
+  onToggleStreaming,
+  page,
+  session,
+  sessionLoading,
+  socketState,
+  statusLabel,
+  streaming,
+  t
+}) {
+  return (
+    <main className="desktop-layout shell">
+      <header className="topbar">
+        <div className="brand-block">
+          <a className="brand-link" href={pageHref('bridge')}>BLE Bridge</a>
+        </div>
+
+        <div className="topbar-actions">
+          <div className="appbar">
+            <nav className="app-nav" aria-label={t('nav.navigation')}>
+              {APP_PAGES.map((item) => (
+                <Fragment key={item}>
+                  <a
+                    aria-current={page === item ? 'page' : undefined}
+                    className={page === item ? 'active' : ''}
+                    href={pageHref(item)}
+                  >
+                    {t(`nav.${item}`)}
+                  </a>
+                  {item === 'privacy' ? (
+                    <button aria-haspopup="dialog" onClick={onOpenPrivacyConsent} type="button">
+                      {t('nav.cookies')}
+                    </button>
+                  ) : null}
+                </Fragment>
+              ))}
+            </nav>
+
+            <label className="language-select" title={t('language.label')}>
+              <Languages size={18} aria-hidden="true" />
+              <span className="language-current" aria-hidden="true">{language.toUpperCase()}</span>
+              <ChevronDown className="language-chevron" size={15} aria-hidden="true" />
+              <span className="visually-hidden">{t('language.label')}</span>
+              <select aria-label={t('language.label')} value={language} onChange={(event) => onSetLanguage(event.target.value)}>
+                <option value="en">{t('language.english')}</option>
+                <option value="de">{t('language.german')}</option>
+              </select>
+            </label>
+
+            <a
+              aria-label={t('github.open')}
+              className="github-ribbon"
+              href="https://github.com/tobias74/ble-web-bridge"
+              rel="noreferrer"
+              target="_blank"
+              title={t('github.open')}
+            >
+              <span className="github-ribbon-label">Fork me on GitHub</span>
+              <span className="github-ribbon-compact-label">GitHub</span>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <DesktopSystemBar
+        hasConnectedDevice={hasConnectedDevice}
+        onCopySessionCode={onCopySessionCode}
+        onRegenerateSession={onRegenerateSession}
+        onToggleStreaming={onToggleStreaming}
+        session={session}
+        sessionLoading={sessionLoading}
+        socketState={socketState}
+        statusLabel={statusLabel}
+        streaming={streaming}
+        t={t}
+      />
+
+      {children}
     </main>
   );
+}
+
+function DesktopSystemBar({
+  hasConnectedDevice,
+  onCopySessionCode,
+  onRegenerateSession,
+  onToggleStreaming,
+  session,
+  sessionLoading,
+  socketState,
+  statusLabel,
+  streaming,
+  t
+}) {
+  return (
+    <section className="system-bar" aria-label={t('status.appStatus')}>
+      <a className="system-status ble-system-status" href={pageHref('bridge')}>
+        <small className="system-status-heading">{t('devices.statusLabel')}</small>
+        <span className="system-status-body">
+          <strong>{t(hasConnectedDevice ? 'devices.connected' : 'devices.none')}</strong>
+        </span>
+      </a>
+
+      <div className="system-status bridge-status">
+        <small className="system-status-heading">{t('status.transmissionLabel')}</small>
+        <div className="system-status-body">
+          <span className={`status-dot ${socketState === 'connected' ? ' online' : ''}`} aria-hidden="true" />
+          <strong>{statusLabel}</strong>
+          <button
+            className="system-transmission-button"
+            onClick={onToggleStreaming}
+            disabled={sessionLoading || !session || socketState !== 'connected'}
+            type="button"
+          >
+            {streaming || !session ? <Pause size={16} /> : <Play size={16} />}
+            <span>{streaming || !session ? t('session.pauseShort') : t('session.resumeShort')}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="session-code" data-testid="session-code" aria-live="polite">
+        <small className="system-status-heading">{t('session.codeLabel')}</small>
+        <div className="session-code-body">
+          <div className="session-code-value">
+            <span data-testid="session-code-value">{session?.code || '---- ----'}</span>
+          </div>
+          <div className="session-code-tools">
+            <button className="session-code-button" onClick={onCopySessionCode} disabled={!session?.code} title={t('session.copyCode')} aria-label={t('session.copyCode')}>
+              <Copy size={17} aria-hidden="true" />
+            </button>
+            <button
+              className="session-code-button session-regenerate-button"
+              onClick={onRegenerateSession}
+              disabled={sessionLoading || !session?.code}
+              title={t('session.regenerateHint')}
+              aria-label={t('session.regenerate')}
+            >
+              <RefreshCw size={17} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MobileApplicationLayout({
+  children,
+  hasConnectedDevice,
+  isNavigationOpen,
+  language,
+  menuButtonRef,
+  navigationRef,
+  onCloseNavigation,
+  onCopySessionCode,
+  onOpenPrivacyConsent,
+  onRegenerateSession,
+  onSetLanguage,
+  onToggleNavigation,
+  onToggleStreaming,
+  page,
+  session,
+  sessionLoading,
+  socketState,
+  statusLabel,
+  streaming,
+  t
+}) {
+  return (
+    <main className="mobile-app">
+      <header className="mobile-appbar">
+        <a className="mobile-appbar-brand" href={pageHref('bridge')}>BLE Bridge</a>
+        <div className="mobile-appbar-actions">
+          <a
+            aria-label={`${t(hasConnectedDevice ? 'status.mobileConnected' : 'status.mobileDisconnected')}. ${t('status.transmissionLabel')}: ${statusLabel}`}
+            className={`mobile-appbar-connection${hasConnectedDevice ? ' is-connected' : ''}`}
+            href={pageHref('bridge')}
+            title={`${t(hasConnectedDevice ? 'status.mobileConnected' : 'status.mobileDisconnected')} · ${statusLabel}`}
+          >
+            <i aria-hidden="true" />
+            <span>{t(hasConnectedDevice ? 'status.mobileConnected' : 'status.mobileDisconnected')}</span>
+          </a>
+          <button
+            aria-controls="mobile-navigation"
+            aria-expanded={isNavigationOpen}
+            aria-label={t(isNavigationOpen ? 'nav.closeMenu' : 'nav.openMenu')}
+            className="mobile-appbar-menu"
+            onClick={onToggleNavigation}
+            ref={menuButtonRef}
+            type="button"
+          >
+            <Menu size={23} aria-hidden="true" />
+          </button>
+        </div>
+      </header>
+
+      {isNavigationOpen ? (
+        <div
+          className="mobile-navigation-overlay"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              onCloseNavigation();
+            }
+          }}
+        >
+          <aside
+            aria-label={t('nav.navigation')}
+            aria-modal="true"
+            className="mobile-navigation"
+            id="mobile-navigation"
+            ref={navigationRef}
+            role="dialog"
+          >
+            <div className="mobile-navigation-header">
+              <strong>{t('nav.navigation')}</strong>
+              <button aria-label={t('nav.closeMenu')} onClick={onCloseNavigation} type="button">
+                <X size={21} aria-hidden="true" />
+              </button>
+            </div>
+
+            <nav className="mobile-navigation-list" aria-label={t('nav.navigation')}>
+              {APP_PAGES.map((item) => (
+                <Fragment key={item}>
+                  <a
+                    aria-current={page === item ? 'page' : undefined}
+                    className={page === item ? 'active' : ''}
+                    href={pageHref(item)}
+                    onClick={onCloseNavigation}
+                  >
+                    {t(`nav.${item}`)}
+                  </a>
+                  {item === 'privacy' ? (
+                    <button
+                      aria-haspopup="dialog"
+                      onClick={() => {
+                        onOpenPrivacyConsent();
+                        onCloseNavigation();
+                      }}
+                      type="button"
+                    >
+                      {t('nav.cookies')}
+                    </button>
+                  ) : null}
+                </Fragment>
+              ))}
+            </nav>
+
+            <div className="mobile-navigation-tools">
+              <label>
+                <span><Languages size={17} aria-hidden="true" />{t('language.label')}</span>
+                <select
+                  aria-label={t('language.label')}
+                  value={language}
+                  onChange={(event) => {
+                    onSetLanguage(event.target.value);
+                    onCloseNavigation();
+                  }}
+                >
+                  <option value="en">{t('language.english')}</option>
+                  <option value="de">{t('language.german')}</option>
+                </select>
+              </label>
+              <a href="https://github.com/tobias74/ble-web-bridge" rel="noreferrer" target="_blank">
+                GitHub
+              </a>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
+      <div className="mobile-app-content">
+        {page === 'bridge' && !hasConnectedDevice ? children : null}
+        {page === 'bridge' ? (
+          <MobileConnectionPanel
+            hasConnectedDevice={hasConnectedDevice}
+            onCopySessionCode={onCopySessionCode}
+            onRegenerateSession={onRegenerateSession}
+            onToggleStreaming={onToggleStreaming}
+            session={session}
+            sessionLoading={sessionLoading}
+            socketState={socketState}
+            statusLabel={statusLabel}
+            streaming={streaming}
+            t={t}
+          />
+        ) : null}
+        {page !== 'bridge' || hasConnectedDevice ? children : null}
+      </div>
+    </main>
+  );
+}
+
+function MobileConnectionPanel({
+  hasConnectedDevice,
+  onCopySessionCode,
+  onRegenerateSession,
+  onToggleStreaming,
+  session,
+  sessionLoading,
+  socketState,
+  statusLabel,
+  streaming,
+  t
+}) {
+  const [copyConfirmation, setCopyConfirmation] = useState(0);
+
+  useEffect(() => {
+    if (!copyConfirmation) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => setCopyConfirmation(0), 2200);
+    return () => clearTimeout(timeout);
+  }, [copyConfirmation]);
+
+  async function handleCopySessionCode() {
+    if (await onCopySessionCode()) {
+      setCopyConfirmation((current) => current + 1);
+    }
+  }
+
+  return (
+    <section className="mobile-connection-panel" aria-label={t('status.appStatus')}>
+      <div className="mobile-connection-code" data-testid="session-code" aria-live="polite">
+        <small>{t('session.codeLabel')}</small>
+        <div>
+          <button className="is-warning" onClick={onRegenerateSession} disabled={sessionLoading || !session?.code} title={t('session.regenerateHint')} aria-label={t('session.regenerate')} type="button">
+            <RefreshCw size={18} aria-hidden="true" />
+          </button>
+          <span data-testid="session-code-value">{session?.code || '---- ----'}</span>
+          <button onClick={handleCopySessionCode} disabled={!session?.code} title={t('session.copyCode')} aria-label={t('session.copyCode')} type="button">
+            <Copy size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mobile-connection-statuses">
+        <div className="mobile-connection-status">
+          <small>{t('devices.statusLabel')}</small>
+          <span>
+            <i className={`mobile-connection-dot${hasConnectedDevice ? ' is-online' : ''}`} aria-hidden="true" />
+            <strong>{t(hasConnectedDevice ? 'devices.connected' : 'devices.none')}</strong>
+          </span>
+        </div>
+        <div className="mobile-connection-status bridge-status">
+          <small>{t('status.transmissionLabel')}</small>
+          <span>
+            <i className={`mobile-connection-dot${socketState === 'connected' ? ' is-online' : ''}`} aria-hidden="true" />
+            <strong>{hasConnectedDevice ? statusLabel : t('status.waitingForDevice')}</strong>
+          </span>
+        </div>
+      </div>
+
+      {hasConnectedDevice ? (
+        <button
+          className="mobile-connection-transmission-action"
+          onClick={onToggleStreaming}
+          disabled={sessionLoading || !session || socketState !== 'connected'}
+          type="button"
+        >
+          {streaming || !session ? <Pause size={17} aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
+          <span>{streaming || !session ? t('session.pause') : t('session.resume')}</span>
+        </button>
+      ) : null}
+
+      {copyConfirmation ? (
+        <div className="mobile-copy-toast" role="status" aria-live="polite" key={copyConfirmation}>
+          <Check size={17} aria-hidden="true" />
+          <span>{t('session.codeCopied')}</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => globalThis.matchMedia?.(query).matches || false);
+
+  useEffect(() => {
+    const mediaQuery = globalThis.matchMedia?.(query);
+    if (!mediaQuery) {
+      return undefined;
+    }
+
+    const updateMatch = (event) => setMatches(event.matches);
+    setMatches(mediaQuery.matches);
+    mediaQuery.addEventListener?.('change', updateMatch);
+    return () => mediaQuery.removeEventListener?.('change', updateMatch);
+  }, [query]);
+
+  return matches;
 }
 
 function DeviceConnectionDialog({
